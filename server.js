@@ -282,6 +282,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     try {
       const person = await cpf.lookup(body.cpf);
+      const genderMap = { M: 'masculino', F: 'feminino' };
       return sendJson(req, res, 200, {
         configured: config.cpf.configured,
         name: person.nome,
@@ -290,6 +291,7 @@ async function handleApi(req, res, url) {
            cliente digitar o próprio número em vez de vir da consulta. */
         phone: null,
         motherName: person.nomeMae,
+        gender: genderMap[person.genero] || '',
       });
     } catch (e) {
       return fail(req, res, e.status || 502, e.message);
