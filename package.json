@@ -13,7 +13,7 @@
     "bspay:check": "node tools/bspay-check.cjs",
     "bspay:balance": "node tools/bspay-check.cjs --balance",
     "test:e2e": "node ../browserctl/ctl.mjs --port 9222 eval @tests/flow.mirror.e2e.js",
-    "check": "node --check server.js && node --check lib/bspay.js && node --check lib/cpf.js && node --check lib/cep.js && node --check lib/pix.js && node --check lib/qrimg.js && node --check lib/store.js && node --check lib/products.js"
+    "check": "node --check server.js && node --check api/index.js && node --check lib/bspay.js && node --check lib/cpf.js && node --check lib/cep.js && node --check lib/pix.js && node --check lib/qrimg.js && node --check lib/store.js && node --check lib/products.js"
   },
   "engines": {
     "node": ">=18"

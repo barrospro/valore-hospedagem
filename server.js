@@ -598,9 +598,11 @@ function sendText(res, status, text, req) {
 
 /* ----------------------------------- server -------------------------------- */
 
-const server = http.createServer(async (req, res) => {
+async function handler(req, res) {
   const started = Date.now();
-  const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
+  const proto = req.headers['x-forwarded-proto'] || 'http';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || '127.0.0.1';
+  const url = new URL(req.url, `${proto}://${host}`);
   try {
     if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
@@ -615,7 +617,9 @@ const server = http.createServer(async (req, res) => {
   if (process.env.ACCESS_LOG === '1') {
     console.log(`${new Date().toISOString()} ${req.method} ${url.pathname} ${res.statusCode} ${Date.now() - started}ms`);
   }
-});
+}
+
+const server = http.createServer(handler);
 
 /** Avisos de configuração que importam em produção. */
 function preflight() {
@@ -663,4 +667,7 @@ if (require.main === module) {
   process.on('uncaughtException', (e) => { console.error('[uncaughtException]', e); store.flushNow(); });
 }
 
-module.exports = { server, handleApi };
+handler.server = server;
+handler.handleApi = handleApi;
+
+module.exports = handler;
