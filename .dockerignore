@@ -1,0 +1,10 @@
+.env
+data
+node_modules
+mirror-src
+tests
+ui-propria
+.git
+Dockerfile
+docker-compose.yml
+*.md

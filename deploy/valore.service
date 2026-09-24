@@ -1,0 +1,25 @@
+# systemd — /etc/systemd/system/valore.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now valore
+[Unit]
+Description=Valore (site + API PIX/BSPay)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=valore
+WorkingDirectory=/opt/valore
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+EnvironmentFile=/opt/valore/.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

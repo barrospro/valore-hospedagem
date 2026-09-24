@@ -1,0 +1,29 @@
+{
+  "name": "valore",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Site de captação de crédito com checkout PIX integrado à BSPay, consulta de CPF e ViaCEP",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:mirror": "node tools/build-mirror.cjs",
+    "check:mirror": "node tools/build-mirror.cjs --check",
+    "mock:bspay": "node tests/mock-bspay.js 3099",
+    "test:prod": "node tests/prod-flow.test.cjs",
+    "bspay:check": "node tools/bspay-check.cjs",
+    "bspay:balance": "node tools/bspay-check.cjs --balance",
+    "test:e2e": "node ../browserctl/ctl.mjs --port 9222 eval @tests/flow.mirror.e2e.js",
+    "check": "node --check server.js && node --check lib/bspay.js && node --check lib/cpf.js && node --check lib/cep.js && node --check lib/pix.js && node --check lib/qrimg.js && node --check lib/store.js && node --check lib/products.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "pix",
+    "bspay",
+    "credito",
+    "correspondente-bancario",
+    "viacep"
+  ],
+  "license": "UNLICENSED"
+}

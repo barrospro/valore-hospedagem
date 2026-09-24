@@ -1,0 +1,19 @@
+# build
+node_modules
+npm-debug.log*
+
+# segredos e dados de produção
+.env
+.env.local
+.env.production
+data/
+tests/*.jsonl
+tests/mock-bspay.log.json
+
+# espelho (fontes baixadas do site; o public/ versionado já basta para deploy)
+# descomente se preferir não versionar os 1,7 MB de mirror-src
+# mirror-src/
+
+# sistema
+.DS_Store
+Thumbs.db

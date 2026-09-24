@@ -1,0 +1,25 @@
+services:
+  valore:
+    build: .
+    image: valore:latest
+    container_name: valore
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATA_DIR: /app/data
+  #   ADMIN_TOKEN: troque-por-um-token-forte      # protege /api/admin/stats
+  #   CORS_ORIGINS: https://seudominio.com.br     # vazio = same-origin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data          # visitantes, leads, ordens e log de auditoria
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
