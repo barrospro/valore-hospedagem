@@ -36,6 +36,7 @@ const products = require('./lib/products');
 const bspay = require('./lib/bspay');
 const pix = require('./lib/pix');
 const qrimg = require('./lib/qrimg');
+const metaCapi = require('./lib/meta-capi');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ORDER_LOG = path.join(config.dataDir, 'orders.jsonl');
@@ -169,6 +170,18 @@ function logOrder(event, order, extra = {}) {
     })}\n`);
   } catch (e) {
     console.warn('[audit] falha ao gravar log:', e.message);
+  }
+
+  /* Disparo server-side de Purchase via Meta Conversions API (CAPI) */
+  if (event === 'completed' && order) {
+    try {
+      const visitor = order.visitorId ? store.getVisitor(order.visitorId) : null;
+      metaCapi.sendPurchase(order, visitor || {}, { userData: extra?.payer || {} }).catch((e) => {
+        console.warn('[meta-capi] falha ao enviar purchase:', e.message);
+      });
+    } catch (e) {
+      console.warn('[meta-capi] erro:', e.message);
+    }
   }
 }
 
