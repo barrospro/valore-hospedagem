@@ -442,7 +442,7 @@ async function handleApi(req, res, url) {
       fresh = store.getOrder(order.id);
     }
 
-    return sendJson(req, res, 200, { id: fresh.id, status: fresh.status, paidAt: fresh.paidAt });
+    return sendJson(req, res, 200, { id: fresh.id, status: fresh.status, amount: fresh.amount, paidAt: fresh.paidAt });
   }
 
   /* ------------------------- simulação de pagamento (dev) -------------------- */

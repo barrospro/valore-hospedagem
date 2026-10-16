@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
@@ -21,6 +21,196 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script type="module" crossorigin src="/assets/index-DNDXb9c6.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DUL9RZWL.css">
+    <!-- Meta Pixel Code -->
+    <script>
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '1436854798395955');
+      fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+      src="https://www.facebook.com/tr?id=1436854798395955&ev=PageView&noscript=1"
+    /></noscript>
+    <!-- End Meta Pixel Code -->
+    <!-- Meta Pixel Event Automation -->
+    <script>
+      (function() {
+        if (typeof window === 'undefined') return;
+
+        // Não executa rastreamento no painel administrativo (/dash ou /p/*)
+        function isAdminRoute() {
+          var p = window.location.pathname;
+          return p.startsWith('/dash') || p.startsWith('/p/');
+        }
+
+        // 1. Rastreia PageView em todas as trocas de rota na SPA
+        var lastTrackedPath = window.location.pathname + window.location.search;
+        function trackSpaPageView() {
+          if (isAdminRoute()) return;
+          var currentPath = window.location.pathname + window.location.search;
+          if (currentPath !== lastTrackedPath) {
+            lastTrackedPath = currentPath;
+            if (typeof window.fbq === 'function') {
+              window.fbq('track', 'PageView');
+            }
+          }
+        }
+
+        var origPushState = history.pushState;
+        if (origPushState) {
+          history.pushState = function() {
+            var ret = origPushState.apply(this, arguments);
+            setTimeout(trackSpaPageView, 0);
+            return ret;
+          };
+        }
+
+        var origReplaceState = history.replaceState;
+        if (origReplaceState) {
+          history.replaceState = function() {
+            var ret = origReplaceState.apply(this, arguments);
+            setTimeout(trackSpaPageView, 0);
+            return ret;
+          };
+        }
+
+        window.addEventListener('popstate', function() {
+          setTimeout(trackSpaPageView, 0);
+        });
+
+        // 2. Intercepta requisições de API para disparar eventos de conversão (Lead, InitiateCheckout, Purchase)
+        var origFetch = window.fetch;
+        if (!origFetch) return;
+
+        var orderAmounts = {};
+        try {
+          var saved = sessionStorage.getItem('valore_pixel_orders');
+          if (saved) orderAmounts = JSON.parse(saved);
+        } catch (e) {}
+
+        var trackedPurchases = {};
+        try {
+          var savedP = sessionStorage.getItem('valore_pixel_purchases');
+          if (savedP) trackedPurchases = JSON.parse(savedP);
+        } catch (e) {}
+
+        var leadTracked = false;
+        try {
+          if (sessionStorage.getItem('valore_pixel_lead')) leadTracked = true;
+        } catch (e) {}
+
+        window.fetch = function() {
+          var args = arguments;
+          var url = '';
+          var method = 'GET';
+
+          if (typeof args[0] === 'string') {
+            url = args[0];
+          } else if (args[0] && args[0].url) {
+            url = args[0].url;
+          }
+
+          if (args[1] && args[1].method) {
+            method = String(args[1].method).toUpperCase();
+          }
+
+          var resultPromise = origFetch.apply(this, args);
+
+          if (isAdminRoute()) return resultPromise;
+
+          return resultPromise.then(function(response) {
+            try {
+              if (!response.ok) return response;
+
+              var clone = response.clone();
+
+              // Lead: quando o usuário consulta CPF ou salva dados de cadastro
+              if (!leadTracked && (url.indexOf('/api/cpf-lookup') !== -1 || (url.indexOf('/api/visitors') !== -1 && (method === 'POST' || method === 'PATCH')))) {
+                clone.json().then(function(data) {
+                  if (data && !leadTracked) {
+                    leadTracked = true;
+                    try {
+                      sessionStorage.setItem('valore_pixel_lead', '1');
+                    } catch (e) {}
+                    if (typeof window.fbq === 'function') {
+                      window.fbq('track', 'Lead');
+                    }
+                  }
+                }).catch(function() {});
+              }
+
+              // InitiateCheckout e AddPaymentInfo: quando o pedido PIX é gerado no checkout
+              if (url.indexOf('/api/orders') !== -1 && method === 'POST') {
+                clone.json().then(function(data) {
+                  var order = data && data.order;
+                  if (order && order.id) {
+                    var amount = Number(order.amount || order.totalPrice || 0);
+                    orderAmounts[order.id] = amount;
+                    try {
+                      sessionStorage.setItem('valore_pixel_orders', JSON.stringify(orderAmounts));
+                    } catch (e) {}
+
+                    if (typeof window.fbq === 'function') {
+                      window.fbq('track', 'InitiateCheckout', {
+                        value: amount,
+                        currency: 'BRL',
+                        content_name: 'Simulação Empréstimo',
+                        content_ids: [order.id],
+                        content_type: 'product'
+                      });
+                      window.fbq('track', 'AddPaymentInfo', {
+                        value: amount,
+                        currency: 'BRL',
+                        content_name: 'Simulação Empréstimo',
+                        content_ids: [order.id],
+                        content_type: 'product'
+                      });
+                    }
+                  }
+                }).catch(function() {});
+              }
+
+              // Purchase: quando o status do PIX é confirmado como concluído/pago
+              var orderMatch = url.match(/\/api\/orders\/([a-zA-Z0-9_-]{4,64})(?:[/?#]|$)/);
+              if (orderMatch && method === 'GET') {
+                clone.json().then(function(data) {
+                  if (data && data.status) {
+                    var status = String(data.status).toUpperCase();
+                    var isPaid = ['COMPLETED', 'PAID', 'APPROVED', 'CONFIRMED'].indexOf(status) !== -1;
+                    var orderId = data.id || orderMatch[1];
+                    if (isPaid && orderId && !trackedPurchases[orderId]) {
+                      trackedPurchases[orderId] = true;
+                      try {
+                        sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
+                      } catch (e) {}
+
+                      var value = orderAmounts[orderId] || Number(data.amount || 0);
+                      if (typeof window.fbq === 'function') {
+                        window.fbq('track', 'Purchase', {
+                          value: value,
+                          currency: 'BRL',
+                          content_ids: [orderId],
+                          content_type: 'product'
+                        });
+                      }
+                    }
+                  }
+                }).catch(function() {});
+              }
+            } catch (err) {}
+
+            return response;
+          });
+        };
+      })();
+    </script>
+    <!-- End Meta Pixel Event Automation -->
   </head>
   <body>
     <div id="root"></div>
