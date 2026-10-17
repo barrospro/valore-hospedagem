@@ -68,6 +68,9 @@
               window.fbq('track', 'PageView');
             }
           }
+          if (typeof checkPostPaymentState === 'function') {
+            checkPostPaymentState();
+          }
         }
 
         var origPushState = history.pushState;
@@ -112,6 +115,45 @@
         try {
           if (sessionStorage.getItem('valore_pixel_lead')) leadTracked = true;
         } catch (e) {}
+
+        function firePurchase(orderId, amount) {
+          if (!orderId || trackedPurchases[orderId]) return;
+          trackedPurchases[orderId] = true;
+          try {
+            sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
+          } catch (e) {}
+
+          var val = Number(amount || orderAmounts[orderId] || 16.00);
+          if (typeof window.fbq === 'function') {
+            window.fbq('track', 'Purchase', {
+              value: val,
+              currency: 'BRL',
+              content_ids: [orderId],
+              content_type: 'product'
+            }, { eventID: orderId });
+          }
+        }
+
+        function checkPostPaymentState() {
+          try {
+            var path = window.location.pathname || '';
+            var bodyText = (document.body && (document.body.innerText || document.body.textContent)) || '';
+            var isConfirmed = bodyText.indexOf('Pagamento confirmado') !== -1 || path.indexOf('/iof') !== -1;
+            if (isConfirmed) {
+              var orderIds = Object.keys(orderAmounts);
+              if (orderIds.length > 0) {
+                var lastId = orderIds[orderIds.length - 1];
+                if (lastId && !trackedPurchases[lastId]) {
+                  firePurchase(lastId, orderAmounts[lastId]);
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (typeof setInterval === 'function') {
+          setInterval(checkPostPaymentState, 1500);
+        }
 
         window.fetch = function() {
           var args = arguments;
@@ -171,14 +213,14 @@
                         content_name: 'Simulação Empréstimo',
                         content_ids: [order.id],
                         content_type: 'product'
-                      });
+                      }, { eventID: 'ic_' + order.id });
                       window.fbq('track', 'AddPaymentInfo', {
                         value: amount,
                         currency: 'BRL',
                         content_name: 'Simulação Empréstimo',
                         content_ids: [order.id],
                         content_type: 'product'
-                      });
+                      }, { eventID: 'api_' + order.id });
                     }
                   }
                 }).catch(function() {});
@@ -192,21 +234,8 @@
                     var status = String(data.status).toUpperCase();
                     var isPaid = ['COMPLETED', 'PAID', 'APPROVED', 'CONFIRMED'].indexOf(status) !== -1;
                     var orderId = data.id || orderMatch[1];
-                    if (isPaid && orderId && !trackedPurchases[orderId]) {
-                      trackedPurchases[orderId] = true;
-                      try {
-                        sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
-                      } catch (e) {}
-
-                      var value = orderAmounts[orderId] || Number(data.amount || 0);
-                      if (typeof window.fbq === 'function') {
-                        window.fbq('track', 'Purchase', {
-                          value: value,
-                          currency: 'BRL',
-                          content_ids: [orderId],
-                          content_type: 'product'
-                        });
-                      }
+                    if (isPaid && orderId) {
+                      firePurchase(orderId, data.amount);
                     }
                   }
                 }).catch(function() {});

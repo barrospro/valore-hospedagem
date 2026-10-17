@@ -176,7 +176,12 @@ function logOrder(event, order, extra = {}) {
   if (event === 'completed' && order) {
     try {
       const visitor = order.visitorId ? store.getVisitor(order.visitorId) : null;
-      metaCapi.sendPurchase(order, visitor || {}, { userData: extra?.payer || {} }).catch((e) => {
+      const combinedUser = {
+        ...(visitor || {}),
+        ...(order.customer || {}),
+        ...(extra?.payer || {}),
+      };
+      metaCapi.sendPurchase(order, combinedUser, { userData: extra?.payer || {} }).catch((e) => {
         console.warn('[meta-capi] falha ao enviar purchase:', e.message);
       });
     } catch (e) {
@@ -427,32 +432,68 @@ async function handleApi(req, res, url) {
   /* ------------------------------ status da ordem --------------------------- */
   const orderMatch = pathname.match(/^\/api\/orders\/([\w-]{4,64})$/);
   if (orderMatch && method === 'GET') {
-    const order = store.getOrder(orderMatch[1]);
+    const orderId = orderMatch[1];
+    let order = store.getOrder(orderId);
+
+    /* Fallback para ambientes serverless (Vercel) onde instâncias não compartilham /tmp */
+    if (!order && config.bspay.configured) {
+      try {
+        const tx = await bspay.findTransaction({ externalId: orderId, transactionId: orderId });
+        if (tx) {
+          const isPaid = bspay.PAID_STATUSES.includes(String(tx.status || '').toLowerCase());
+          const paidStatus = isPaid ? 'COMPLETED' : 'PENDING';
+          order = store.createOrder({
+            id: orderId,
+            externalId: tx.external_id || orderId,
+            transactionId: tx.transaction_id || null,
+            status: paidStatus,
+            amount: Number(tx.amount || 0),
+            totalPrice: Number(tx.amount || 0),
+            provider: 'bspay',
+            paidAt: isPaid ? (tx.confirmed_at || new Date().toISOString()) : null,
+            customer: {
+              name: tx.payer?.name || tx.generated?.name || '',
+              document: tx.payer?.document || tx.generated?.document || '',
+              email: tx.generated?.email || '',
+            },
+          });
+          if (isPaid) {
+            logOrder('completed', order, { source: 'bspay-fallback', payer: tx.payer || tx.generated });
+          }
+        }
+      } catch (e) {
+        console.warn('[orders] falha no fallback BSPay:', e.message);
+      }
+    }
+
     if (!order) return fail(req, res, 404, 'Ordem não encontrada');
 
     store.expireStale();
-    let fresh = store.getOrder(order.id);
+    let fresh = store.getOrder(order.id) || order;
 
-    /* Reconciliação: pendente + BSPay configurada + ordem com mais de 15s. */
-    const ageMs = Date.now() - new Date(fresh.createdAt).getTime();
+    /* Reconciliação: pendente + BSPay configurada */
+    const ageMs = Date.now() - new Date(fresh.createdAt || Date.now()).getTime();
     if (
       fresh.status === 'PENDING'
       && fresh.provider === 'bspay'
       && config.bspay.configured
-      && ageMs > 15000
-      && Date.now() - (fresh.lastReconcileAt || 0) > 10000
+      && (ageMs > 8000 || !fresh.createdAt)
+      && Date.now() - (fresh.lastReconcileAt || 0) > 4000
     ) {
       store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
       try {
         const check = await bspay.isChargePaid({ externalId: fresh.externalId, transactionId: fresh.transactionId });
         if (check.paid) {
           store.completeOrder(fresh.id, 'reconcile', { status: check.status });
-          logOrder('completed', store.getOrder(fresh.id), { source: 'reconcile' });
+          fresh = store.getOrder(fresh.id) || fresh;
+          fresh.status = 'COMPLETED';
+          fresh.paidAt = fresh.paidAt || check.tx?.confirmed_at || new Date().toISOString();
+          logOrder('completed', fresh, { source: 'reconcile', payer: check.tx?.payer || check.tx?.generated });
         }
       } catch (e) {
         console.warn('[reconcile] falha:', e.message);
       }
-      fresh = store.getOrder(order.id);
+      fresh = store.getOrder(order.id) || fresh;
     }
 
     return sendJson(req, res, 200, { id: fresh.id, status: fresh.status, amount: fresh.amount, paidAt: fresh.paidAt });
@@ -484,7 +525,25 @@ async function handleApi(req, res, url) {
     const data = payload.data || {};
     const txId = payload.transaction_id || data.transaction_id;
     const externalId = data.external_id || payload.external_id;
-    const order = (externalId && store.findByExternalId(externalId)) || store.findByTransactionId(txId);
+    let order = (externalId && store.findByExternalId(externalId)) || store.findByTransactionId(txId);
+
+    /* Recupera ordem em ambientes serverless se não estiver em memória */
+    if (!order && externalId) {
+      order = store.createOrder({
+        id: externalId,
+        externalId,
+        transactionId: txId || null,
+        status: 'PENDING',
+        amount: Number(data.amount || payload.amount || 0),
+        totalPrice: Number(data.amount || payload.amount || 0),
+        provider: 'bspay',
+        customer: {
+          name: data.payer?.name || payload.payer?.name || data.generated?.name || '',
+          document: data.payer?.document || payload.payer?.document || data.generated?.document || '',
+          email: data.generated?.email || payload.generated?.email || '',
+        },
+      });
+    }
 
     /* Verificação: assinatura HMAC quando existe segredo; caso contrário,
        o webhook é tratado apenas como aviso e a confirmação é buscada na API. */
@@ -515,7 +574,9 @@ async function handleApi(req, res, url) {
 
     if (event === 'cashin.confirmed' && confirmed) {
       store.completeOrder(order.id, verified ? 'webhook' : 'webhook+gateway', payload);
-      logOrder('completed', store.getOrder(order.id), { source: verified ? 'webhook' : 'webhook+gateway' });
+      const updated = store.getOrder(order.id) || order;
+      updated.status = 'COMPLETED';
+      logOrder('completed', updated, { source: verified ? 'webhook' : 'webhook+gateway', payer: data.payer || data.generated });
     } else if (event === 'cashin.expired') {
       store.updateOrder(order.id, { status: 'EXPIRED' });
     } else if (event === 'cashin.refunded') {
