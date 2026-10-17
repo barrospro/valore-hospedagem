@@ -208,12 +208,97 @@ function postbackFromRequest(req) {
   return `${proto}://${host}/api/webhooks/bspay`;
 }
 
+/* ------------------------ sincronização contínua com Meta CAPI ------------- */
+const KNOWN_SYNCED = [
+  'valore-mvcktcx2wxs81ffv',
+  'valore-mvcknzlsbc9e1fp2',
+  'valore-mvcknq0qj5t256x3',
+  'valore-mvbi3f9e189zfggq',
+  'valore-mvb26b1xf3zcrm87',
+  'valore-mva6l2ghqegha68r',
+  'valore-mva2vhr4n61d7wtl',
+  'valore-mva291pacv6cxk6d',
+  'valore-mva0bn4yk94oz4wl',
+  'valore-mv8r1rjza4ruvb6i',
+];
+
+const SYNCED_FILE = path.join(config.dataDir, 'synced-purchases.json');
+let syncedSet = null;
+
+function getSyncedSet() {
+  if (syncedSet) return syncedSet;
+  syncedSet = new Set(KNOWN_SYNCED);
+  try {
+    if (fs.existsSync(SYNCED_FILE)) {
+      const arr = JSON.parse(fs.readFileSync(SYNCED_FILE, 'utf8'));
+      if (Array.isArray(arr)) arr.forEach((id) => syncedSet.add(id));
+    }
+  } catch {}
+  return syncedSet;
+}
+
+function markSynced(id) {
+  const set = getSyncedSet();
+  set.add(id);
+  try {
+    fs.mkdirSync(config.dataDir, { recursive: true });
+    fs.writeFileSync(SYNCED_FILE, JSON.stringify([...set]));
+  } catch {}
+}
+
+let lastSyncAt = 0;
+async function syncRecentConfirmedOrders() {
+  const now = Date.now();
+  if (now - lastSyncAt < 20000) return; // max 1 verificação a cada 20s
+  lastSyncAt = now;
+
+  try {
+    const list = await bspay.listTransactions({ page: 1, pageSize: 20, source: 'cashin', status: 'confirmed' });
+    const items = Array.isArray(list) ? list : (list?.items || []);
+    const synced = getSyncedSet();
+
+    for (const tx of items) {
+      const extId = tx.external_id;
+      if (!extId || synced.has(extId)) continue;
+
+      markSynced(extId);
+
+      const order = store.getOrder(extId) || store.createOrder({
+        id: extId,
+        externalId: extId,
+        transactionId: tx.transaction_id || null,
+        status: 'COMPLETED',
+        amount: Number(tx.amount || 0),
+        totalPrice: Number(tx.amount || 0),
+        provider: 'bspay',
+        paidAt: tx.confirmed_at || new Date().toISOString(),
+        customer: {
+          name: tx.payer?.name || tx.generated?.name || '',
+          document: tx.payer?.document || tx.generated?.document || '',
+          email: tx.generated?.email || '',
+        },
+      });
+
+      logOrder('completed', order, {
+        source: 'bspay-sync',
+        payer: tx.payer || tx.generated,
+      });
+      console.log(`[auto-sync] Nova venda sincronizada com Meta CAPI: ${extId} (R$ ${tx.amount})`);
+    }
+  } catch (e) {
+    console.warn('[auto-sync] falha:', e.message);
+  }
+}
+
 /* ----------------------------------- API ---------------------------------- */
 
 async function handleApi(req, res, url) {
   const { pathname, searchParams } = url;
   const method = req.method.toUpperCase();
   const ip = clientIp(req);
+
+  // Executa sync de vendas em background com gateway de forma não-bloqueante
+  syncRecentConfirmedOrders().catch(() => {});
 
   if (method === 'OPTIONS') {
     res.writeHead(204, {
@@ -250,6 +335,16 @@ async function handleApi(req, res, url) {
       }
     }
     return sendJson(req, res, 200, out);
+  }
+
+  if (pathname === '/api/sync') {
+    lastSyncAt = 0; // força execução imediata
+    await syncRecentConfirmedOrders();
+    return sendJson(req, res, 200, {
+      status: 'ok',
+      syncedCount: getSyncedSet().size,
+      synced: [...getSyncedSet()],
+    });
   }
 
   if (pathname === '/api/admin/stats') {
