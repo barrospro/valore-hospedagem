@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b2e1a"/>
+      <stop offset="50%" stop-color="#144d2d"/>
+      <stop offset="100%" stop-color="#062112"/>
+    </linearGradient>
+    <linearGradient id="waGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#25D366"/>
+      <stop offset="100%" stop-color="#128C7E"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#25D366" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Container Squircle -->
+  <rect width="128" height="128" rx="28" fill="url(#bgGrad)"/>
+  <rect width="126" height="126" x="1" y="1" rx="27" fill="none" stroke="url(#waGrad)" stroke-width="2" stroke-opacity="0.5"/>
+
+  <!-- Headset Graphic -->
+  <g filter="url(#glow)">
+    <!-- Headband -->
+    <path d="M38 64 C38 42 50 30 64 30 C78 30 90 42 90 64" 
+          fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+    
+    <!-- Left Ear Cup -->
+    <rect x="30" y="56" width="16" height="26" rx="8" fill="url(#waGrad)"/>
+    <!-- Right Ear Cup -->
+    <rect x="82" y="56" width="16" height="26" rx="8" fill="url(#waGrad)"/>
+    
+    <!-- Microphone boom -->
+    <path d="M88 74 C88 90 76 96 64 96" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="62" cy="96" r="4.5" fill="url(#goldGrad)"/>
+  </g>
+
+  <!-- VIP 24h Pill Badge -->
+  <g transform="translate(38, 92)">
+    <rect width="52" height="22" rx="11" fill="url(#goldGrad)"/>
+    <text x="26" y="15.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="12" font-weight="900" fill="#0b2e1a" text-anchor="middle" letter-spacing="0.8">24 HORAS</text>
+  </g>
+
+  <!-- Active Online Dot -->
+  <circle cx="94" cy="34" r="5" fill="#22c55e"/>
+  <circle cx="94" cy="34" r="9" fill="none" stroke="#22c55e" stroke-width="2" opacity="0.6"/>
+</svg>
