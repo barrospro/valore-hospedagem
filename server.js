@@ -260,6 +260,12 @@ async function syncRecentConfirmedOrders() {
     const items = Array.isArray(list) ? list : (list?.items || []);
     const synced = getSyncedSet();
 
+    try {
+      const bal = await bspay.balance();
+      const dailyRev = Number(bal?.daily_revenue_brl || 0);
+      if (dailyRev > 0) store.updateBspayRevenue(dailyRev);
+    } catch {}
+
     const todayConfirmed = items
       .filter((tx) => tx.status === 'confirmed' && String(tx.confirmed_at || '').startsWith('2026-10-18'))
       .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
