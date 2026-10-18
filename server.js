@@ -256,9 +256,16 @@ async function syncRecentConfirmedOrders() {
   lastSyncAt = now;
 
   try {
-    const list = await bspay.listTransactions({ page: 1, pageSize: 20, source: 'cashin', status: 'confirmed' });
+    const list = await bspay.listTransactions({ page: 1, pageSize: 50, source: 'cashin', status: 'confirmed' });
     const items = Array.isArray(list) ? list : (list?.items || []);
     const synced = getSyncedSet();
+
+    const todayConfirmed = items
+      .filter((tx) => tx.status === 'confirmed' && String(tx.confirmed_at || '').startsWith('2026-10-18'))
+      .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+    if (todayConfirmed > 0) {
+      store.updateBspayRevenue(todayConfirmed);
+    }
 
     for (const tx of items) {
       const extId = tx.external_id;
@@ -324,6 +331,7 @@ async function handleApi(req, res, url) {
       nitropayConfigured: config.nitropay.configured,
       nitropayEnabled: config.nitropay.enabled,
       cpfApiConfigured: config.cpf.configured,
+      routingStatus: store.getRoutingStatus(),
       mockPix: config.allowMockPix,
       webhookSecured: config.bspay.webhookSecured,
       sandbox: config.bspay.sandbox,
@@ -362,6 +370,7 @@ async function handleApi(req, res, url) {
     }
     return sendJson(req, res, 200, {
       ...store.stats(),
+      routing: store.getRoutingStatus(),
       bspay: { configured: config.bspay.configured, base: config.bspay.apiBase, sandbox: config.bspay.sandbox },
       pix: { provider: config.bspay.configured ? 'bspay' : 'mock' },
     });
