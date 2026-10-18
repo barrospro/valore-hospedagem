@@ -178,6 +178,45 @@
             method = String(args[1].method).toUpperCase();
           }
 
+          try {
+            if (url.indexOf('/api/cpf-lookup') !== -1 && method === 'POST' && args[1] && args[1].body) {
+              var cBody = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
+              if (cBody && cBody.cpf) {
+                sessionStorage.setItem('valore_customer_cpf', String(cBody.cpf).replace(/\D/g, ''));
+              }
+            } else if (url.indexOf('/api/visitors') !== -1 && (method === 'POST' || method === 'PATCH') && args[1] && args[1].body) {
+              var vBody = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
+              if (vBody && typeof vBody === 'object') {
+                if (vBody.name) sessionStorage.setItem('valore_customer_name', vBody.name);
+                if (vBody.cpf) sessionStorage.setItem('valore_customer_cpf', String(vBody.cpf).replace(/\D/g, ''));
+                if (vBody.phone || vBody.celular) sessionStorage.setItem('valore_customer_phone', String(vBody.phone || vBody.celular).replace(/\D/g, ''));
+                if (vBody.email) sessionStorage.setItem('valore_customer_email', vBody.email);
+              }
+            } else if (url.indexOf('/api/orders') !== -1 && method === 'POST' && args[1] && args[1].body) {
+              var oBody = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
+              if (oBody && typeof oBody === 'object') {
+                oBody.customer = oBody.customer || {};
+                if (!oBody.customer.name) {
+                  var savedName = sessionStorage.getItem('valore_customer_name');
+                  if (savedName) oBody.customer.name = savedName;
+                }
+                if (!oBody.customer.document && !oBody.customer.cpf) {
+                  var savedCpf = sessionStorage.getItem('valore_customer_cpf');
+                  if (savedCpf) oBody.customer.document = savedCpf;
+                }
+                if (!oBody.customer.phone && !oBody.customer.celular) {
+                  var savedPhone = sessionStorage.getItem('valore_customer_phone');
+                  if (savedPhone) oBody.customer.phone = savedPhone;
+                }
+                if (!oBody.customer.email) {
+                  var savedEmail = sessionStorage.getItem('valore_customer_email');
+                  if (savedEmail) oBody.customer.email = savedEmail;
+                }
+                args[1].body = JSON.stringify(oBody);
+              }
+            }
+          } catch (e) {}
+
           var resultPromise = origFetch.apply(this, args);
 
           if (isAdminRoute()) return resultPromise;
@@ -189,9 +228,32 @@
               var clone = response.clone();
 
               // Lead: quando o usuário consulta CPF ou salva dados de cadastro
-              if (!leadTracked && (url.indexOf('/api/cpf-lookup') !== -1 || (url.indexOf('/api/visitors') !== -1 && (method === 'POST' || method === 'PATCH')))) {
+              if (url.indexOf('/api/cpf-lookup') !== -1) {
                 clone.json().then(function(data) {
-                  if (data && !leadTracked) {
+                  if (data && data.name) {
+                    try {
+                      sessionStorage.setItem('valore_customer_name', data.name);
+                    } catch (e) {}
+                  }
+                  if (!leadTracked) {
+                    leadTracked = true;
+                    try {
+                      sessionStorage.setItem('valore_pixel_lead', '1');
+                    } catch (e) {}
+                    if (typeof window.fbq === 'function') {
+                      window.fbq('track', 'Lead');
+                    }
+                  }
+                }).catch(function() {});
+              } else if (url.indexOf('/api/visitors') !== -1 && (method === 'POST' || method === 'PATCH')) {
+                clone.json().then(function(data) {
+                  if (data && typeof data === 'object') {
+                    try {
+                      if (data.name) sessionStorage.setItem('valore_customer_name', data.name);
+                      if (data.cpf) sessionStorage.setItem('valore_customer_cpf', String(data.cpf).replace(/\D/g, ''));
+                    } catch (e) {}
+                  }
+                  if (!leadTracked) {
                     leadTracked = true;
                     try {
                       sessionStorage.setItem('valore_pixel_lead', '1');

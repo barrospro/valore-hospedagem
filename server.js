@@ -455,6 +455,32 @@ async function handleApi(req, res, url) {
 
     const amount = products.totalOf(items);
     const visitor = visitorId ? store.getVisitor(visitorId) : null;
+    const clientCustomer = (body && typeof body.customer === 'object') ? body.customer : {};
+
+    let customerName = String(clientCustomer.name || visitor?.name || '').trim();
+    let customerDoc = String(clientCustomer.document || clientCustomer.cpf || visitor?.cpf || '').replace(/\D/g, '');
+    let customerEmail = String(clientCustomer.email || visitor?.email || '').trim();
+    let customerPhone = String(clientCustomer.phone || clientCustomer.celular || visitor?.phone || '').replace(/\D/g, '');
+
+    if (!customerName && customerDoc && customerDoc.length === 11 && config.cpf.configured) {
+      try {
+        const person = await cpf.lookup(customerDoc);
+        if (person && person.nome) {
+          customerName = person.nome;
+        }
+      } catch (e) {
+        /* fallback silencioso */
+      }
+    }
+
+    if (visitorId && visitor) {
+      store.updateVisitor(visitorId, {
+        ...(customerName ? { name: customerName } : {}),
+        ...(customerDoc ? { cpf: customerDoc } : {}),
+        ...(customerEmail ? { email: customerEmail } : {}),
+        ...(customerPhone ? { phone: customerPhone } : {}),
+      });
+    }
 
     const chosenGateway = store.getNextGateway();
     let usedGateway = chosenGateway;
@@ -470,10 +496,10 @@ async function handleApi(req, res, url) {
       channel,
       pushNotificationId: body.pushNotificationId || null,
       customer: {
-        name: visitor?.name || '',
-        document: (visitor?.cpf || '').replace(/\D/g, ''),
-        email: visitor?.email || '',
-        phone: (visitor?.phone || '').replace(/\D/g, ''),
+        name: customerName,
+        document: customerDoc,
+        email: customerEmail,
+        phone: customerPhone,
       },
       ip,
     });
