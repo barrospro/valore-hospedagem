@@ -18,3 +18,4 @@ tests/mock-bspay.log.json
 # sistema
 .DS_Store
 Thumbs.db
+.vercel

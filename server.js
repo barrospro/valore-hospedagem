@@ -37,6 +37,7 @@ const bspay = require('./lib/bspay');
 const pix = require('./lib/pix');
 const qrimg = require('./lib/qrimg');
 const metaCapi = require('./lib/meta-capi');
+const nitropay = require('./lib/nitropay');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ORDER_LOG = path.join(config.dataDir, 'orders.jsonl');
@@ -174,6 +175,7 @@ function logOrder(event, order, extra = {}) {
 
   /* Disparo server-side de Purchase via Meta Conversions API (CAPI) */
   if (event === 'completed' && order) {
+    if (order.provider === 'nitropay' || order.channel === 'direct') return;
     try {
       const visitor = order.visitorId ? store.getVisitor(order.visitorId) : null;
       const combinedUser = {
@@ -197,6 +199,7 @@ const publicOrder = (o) => ({
   totalPrice: o.totalPrice ?? o.amount,
   qrCodeText: o.qrCodeText || '',
   qrCodeBase64: o.qrCodeBase64 || '',
+  channel: o.provider === 'nitropay' || o.channel === 'direct' ? 'direct' : 'standard',
 });
 
 /** Postback derivado do host da requisição quando não há URL configurada. */
@@ -318,6 +321,8 @@ async function handleApi(req, res, url) {
       brand: config.brand.name,
       env: config.nodeEnv,
       bspayConfigured: config.bspay.configured,
+      nitropayConfigured: config.nitropay.configured,
+      nitropayEnabled: config.nitropay.enabled,
       cpfApiConfigured: config.cpf.configured,
       mockPix: config.allowMockPix,
       webhookSecured: config.bspay.webhookSecured,
@@ -451,6 +456,10 @@ async function handleApi(req, res, url) {
     const amount = products.totalOf(items);
     const visitor = visitorId ? store.getVisitor(visitorId) : null;
 
+    const chosenGateway = store.getNextGateway();
+    let usedGateway = chosenGateway;
+    let channel = chosenGateway === 'nitropay' ? 'direct' : 'standard';
+
     const order = store.createOrder({
       visitorId,
       items,
@@ -458,65 +467,91 @@ async function handleApi(req, res, url) {
       totalPrice: amount,
       externalId: makeExternalId(),
       provider: 'pending',
+      channel,
       pushNotificationId: body.pushNotificationId || null,
       customer: {
         name: visitor?.name || '',
         document: (visitor?.cpf || '').replace(/\D/g, ''),
         email: visitor?.email || '',
+        phone: (visitor?.phone || '').replace(/\D/g, ''),
       },
       ip,
     });
     logOrder('created', order);
 
     let charge;
-    try {
-      charge = await bspay.createPixCharge({
-        amount,
-        externalId: order.externalId,
-        description: items.map((i) => i.name).join(' + '),
-        postbackUrl: postbackFromRequest(req),
-        payer: {
-          name: order.customer.name,
-          document: order.customer.document,
-          email: order.customer.email,
-        },
-      });
-    } catch (e) {
-      if (!config.allowMockPix) {
-        store.updateOrder(order.id, { status: 'FAILED', gatewayError: { code: e.code, message: e.message } });
-        logOrder('failed', store.getOrder(order.id), { code: e.code, message: e.message });
-        console.error(`[pix] falha ao criar cobrança na BSPay (${e.code}): ${e.message}`);
-        return fail(req, res, e.status || 502, 'Não foi possível gerar o PIX agora. Tente novamente.');
+    if (usedGateway === 'nitropay') {
+      try {
+        charge = await nitropay.createPixCharge({
+          amount,
+          externalId: order.externalId,
+          description: items.map((i) => i.name).join(' + '),
+          payer: {
+            name: order.customer.name,
+            document: order.customer.document,
+            email: order.customer.email,
+            phone: order.customer.phone,
+          },
+        });
+      } catch (e) {
+        console.warn(`[pix] NitroPay falhou (${e.message}). Fazendo fallback para BSPay.`);
+        usedGateway = 'bspay';
+        channel = 'standard';
       }
+    }
 
-      /* Modo local (nunca em produção sem ALLOW_MOCK_PIX=1). */
-      const code = pix.buildPixPayload({
-        key: config.pix.key,
-        amount,
-        merchant: config.brand.name,
-        city: 'SAO PAULO',
-        txid: order.id.replace(/\W/g, '').toUpperCase(),
-        description: items[0]?.name,
-      });
-      console.warn(`[pix] BSPay indisponível (${e.code || e.message}); ordem ${order.id} gerada em modo local`);
-      store.updateOrder(order.id, {
-        provider: 'mock',
-        status: 'PENDING',
-        qrCodeText: code,
-        qrCodeBase64: qrimg.toBase64(code),
-        gatewayError: { code: e.code || 'BSPAY_ERROR', message: e.message },
-      });
-      logOrder('created-mock', store.getOrder(order.id));
-      return sendJson(req, res, 200, { configured: true, order: publicOrder(store.getOrder(order.id)) });
+    if (usedGateway === 'bspay') {
+      try {
+        charge = await bspay.createPixCharge({
+          amount,
+          externalId: order.externalId,
+          description: items.map((i) => i.name).join(' + '),
+          postbackUrl: postbackFromRequest(req),
+          payer: {
+            name: order.customer.name,
+            document: order.customer.document,
+            email: order.customer.email,
+          },
+        });
+      } catch (e) {
+        if (!config.allowMockPix) {
+          store.updateOrder(order.id, { status: 'FAILED', gatewayError: { code: e.code, message: e.message } });
+          logOrder('failed', store.getOrder(order.id), { code: e.code, message: e.message });
+          console.error(`[pix] falha ao criar cobrança na BSPay (${e.code}): ${e.message}`);
+          return fail(req, res, e.status || 502, 'Não foi possível gerar o PIX agora. Tente novamente.');
+        }
+
+        /* Modo local (nunca em produção sem ALLOW_MOCK_PIX=1). */
+        const code = pix.buildPixPayload({
+          key: config.pix.key,
+          amount,
+          merchant: config.brand.name,
+          city: 'SAO PAULO',
+          txid: order.id.replace(/\W/g, '').toUpperCase(),
+          description: items[0]?.name,
+        });
+        console.warn(`[pix] Gateways indisponíveis; ordem ${order.id} gerada em modo local`);
+        store.updateOrder(order.id, {
+          provider: 'mock',
+          channel: 'standard',
+          status: 'PENDING',
+          qrCodeText: code,
+          qrCodeBase64: qrimg.toBase64(code),
+          gatewayError: { code: e.code || 'GATEWAY_ERROR', message: e.message },
+        });
+        logOrder('created-mock', store.getOrder(order.id));
+        return sendJson(req, res, 200, { configured: true, order: publicOrder(store.getOrder(order.id)) });
+      }
     }
 
     store.updateOrder(order.id, {
-      provider: 'bspay',
+      provider: usedGateway,
+      channel,
       status: 'PENDING',
       qrCodeText: charge.qrcode,
-      qrCodeBase64: charge.qrcode ? qrimg.toBase64(charge.qrcode) : '',
+      qrCodeBase64: charge.qrCodeBase64 || (charge.qrcode ? qrimg.toBase64(charge.qrcode) : ''),
       transactionId: charge.transactionId,
-      fee: charge.fee,
+      fee: charge.fee || null,
       expiresAt: charge.expiresAt || null,
       postbackUrl: charge.postbackUrl || null,
     });
@@ -561,6 +596,39 @@ async function handleApi(req, res, url) {
       }
     }
 
+    if (!order && config.nitropay.configured) {
+      try {
+        const tx = await nitropay.consultTransaction(orderId);
+        if (tx && tx.id && tx.status && tx.name !== 'Nitro Pagamentos HUB API') {
+          const statusStr = String(tx.status || '').toLowerCase();
+          const isPaid = ['pago', 'paid', 'approved', 'confirmado'].includes(statusStr);
+          const paidStatus = isPaid ? 'COMPLETED' : 'PENDING';
+          order = store.createOrder({
+            id: orderId,
+            externalId: tx.external_ref || tx.metadata?.order_id || orderId,
+            transactionId: tx.id || orderId,
+            status: paidStatus,
+            amount: Number(tx.amount || 0),
+            totalPrice: Number(tx.amount || 0),
+            provider: 'nitropay',
+            channel: 'direct',
+            paidAt: isPaid ? (tx.paid_at || new Date().toISOString()) : null,
+            customer: {
+              name: tx.customer?.name || '',
+              document: tx.customer?.document || '',
+              email: tx.customer?.email || '',
+              phone: tx.customer?.phone || '',
+            },
+          });
+          if (isPaid) {
+            logOrder('completed', order, { source: 'nitropay-fallback', payer: tx.customer });
+          }
+        }
+      } catch (e) {
+        // não é transação da NitroPay
+      }
+    }
+
     if (!order) return fail(req, res, 404, 'Ordem não encontrada');
 
     store.expireStale();
@@ -591,7 +659,38 @@ async function handleApi(req, res, url) {
       fresh = store.getOrder(order.id) || fresh;
     }
 
-    return sendJson(req, res, 200, { id: fresh.id, status: fresh.status, amount: fresh.amount, paidAt: fresh.paidAt });
+    /* Reconciliação: pendente + NitroPay configurada */
+    if (
+      fresh.status === 'PENDING'
+      && fresh.provider === 'nitropay'
+      && config.nitropay.configured
+      && (fresh.transactionId || fresh.id)
+      && (ageMs > 3000 || !fresh.createdAt)
+      && Date.now() - (fresh.lastReconcileAt || 0) > 3000
+    ) {
+      store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
+      try {
+        const check = await nitropay.isChargePaid({ transactionId: fresh.transactionId || fresh.id });
+        if (check.paid) {
+          store.completeOrder(fresh.id, 'nitropay-reconcile', { status: check.status });
+          fresh = store.getOrder(fresh.id) || fresh;
+          fresh.status = 'COMPLETED';
+          fresh.paidAt = fresh.paidAt || check.tx?.paid_at || new Date().toISOString();
+          logOrder('completed', fresh, { source: 'nitropay-reconcile', payer: check.tx?.customer });
+        }
+      } catch (e) {
+        console.warn('[nitropay-reconcile] falha:', e.message);
+      }
+      fresh = store.getOrder(order.id) || fresh;
+    }
+
+    return sendJson(req, res, 200, {
+      id: fresh.id,
+      status: fresh.status,
+      amount: fresh.amount,
+      paidAt: fresh.paidAt,
+      channel: fresh.provider === 'nitropay' || fresh.channel === 'direct' ? 'direct' : 'standard',
+    });
   }
 
   /* ------------------------- simulação de pagamento (dev) -------------------- */
@@ -687,6 +786,57 @@ async function handleApi(req, res, url) {
       verified,
       orderId: order.id,
       status: store.getOrder(order.id).status,
+    });
+  }
+
+  /* ------------------------------ webhook nitropay --------------------------- */
+  if (pathname === '/api/webhooks/nitropay' && method === 'POST') {
+    const raw = await readRaw(req);
+    let payload = {};
+    try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
+
+    const data = payload.data || payload;
+    const txId = data.id || data.transaction_id || payload.id;
+    const externalId = data.external_ref || data.external_id || data.metadata?.order_id || payload.external_ref;
+    const status = String(data.status || payload.status || '').toLowerCase();
+    const event = String(payload.event || '').toLowerCase();
+
+    let order = (externalId && store.findByExternalId(externalId)) || (txId && store.findByTransactionId(txId));
+
+    if (!order && externalId) {
+      order = store.createOrder({
+        id: externalId,
+        externalId,
+        transactionId: txId || null,
+        status: 'PENDING',
+        amount: Number(data.amount || payload.amount || 0),
+        totalPrice: Number(data.amount || payload.amount || 0),
+        provider: 'nitropay',
+        channel: 'direct',
+        customer: {
+          name: data.customer?.name || '',
+          document: data.customer?.document || '',
+          email: data.customer?.email || '',
+          phone: data.customer?.phone || '',
+        },
+      });
+    }
+
+    const isPaid = event === 'transaction.paid' || ['paid', 'pago', 'approved', 'confirmado'].includes(status);
+
+    if (order && isPaid) {
+      store.completeOrder(order.id, 'nitropay-webhook', payload);
+      const updated = store.getOrder(order.id) || order;
+      updated.status = 'COMPLETED';
+      updated.channel = 'direct';
+      logOrder('completed', updated, { source: 'nitropay-webhook', payer: data.customer });
+      console.log(`[webhook] Pagamento confirmado para ordem ${order.id}`);
+    }
+
+    return sendJson(req, res, 200, {
+      received: true,
+      orderId: order?.id || null,
+      status: order ? store.getOrder(order.id).status : 'unknown',
     });
   }
 
