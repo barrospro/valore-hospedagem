@@ -175,7 +175,6 @@ function logOrder(event, order, extra = {}) {
 
   /* Disparo server-side de Purchase via Meta Conversions API (CAPI) */
   if (event === 'completed' && order) {
-    if (order.provider === 'nitropay' || order.channel === 'direct') return;
     try {
       const visitor = order.visitorId ? store.getVisitor(order.visitorId) : null;
       const combinedUser = {
