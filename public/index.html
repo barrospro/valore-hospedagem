@@ -27,6 +27,16 @@
     </script>
     <script defer src="/_vercel/insights/script.js" onerror="this.onerror=null;this.src='https://va.vercel-scripts.com/v1/script.js';"></script>
     <!-- End Vercel Web Analytics -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3NGR6D3GKF"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-3NGR6D3GKF');
+    </script>
+    <!-- End Google tag (gtag.js) -->
     <!-- Meta Pixel Code -->
     <script>
       !function(f,b,e,v,n,t,s)
@@ -68,6 +78,12 @@
             lastTrackedPath = currentPath;
             if (typeof window.fbq === 'function') {
               window.fbq('track', 'PageView');
+            }
+            if (typeof window.gtag === 'function') {
+              window.gtag('event', 'page_view', {
+                page_path: currentPath,
+                page_location: window.location.href
+              });
             }
           }
           if (typeof checkPostPaymentState === 'function') {
@@ -142,6 +158,19 @@
               content_ids: [orderId],
               content_type: 'product'
             }, { eventID: orderId });
+          }
+          if (typeof window.gtag === 'function') {
+            window.gtag('event', 'purchase', {
+              transaction_id: orderId,
+              value: val,
+              currency: 'BRL',
+              items: [{
+                item_id: orderId,
+                item_name: 'Simulação Empréstimo',
+                price: val,
+                quantity: 1
+              }]
+            });
           }
         }
 
@@ -250,6 +279,9 @@
                     if (typeof window.fbq === 'function') {
                       window.fbq('track', 'Lead');
                     }
+                    if (typeof window.gtag === 'function') {
+                      window.gtag('event', 'generate_lead');
+                    }
                   }
                 }).catch(function() {});
               } else if (url.indexOf('/api/visitors') !== -1 && (method === 'POST' || method === 'PATCH')) {
@@ -267,6 +299,9 @@
                     } catch (e) {}
                     if (typeof window.fbq === 'function') {
                       window.fbq('track', 'Lead');
+                    }
+                    if (typeof window.gtag === 'function') {
+                      window.gtag('event', 'generate_lead');
                     }
                   }
                 }).catch(function() {});
@@ -289,7 +324,7 @@
                     } catch (e) {}
 
                     if (isCloaked) {
-                      // INDETECTAVEL: Suprime InitiateCheckout e AddPaymentInfo no Meta Pixel
+                      // INDETECTAVEL: Suprime InitiateCheckout, AddPaymentInfo e Google Tag
                       return;
                     }
 
@@ -308,6 +343,19 @@
                         content_ids: [order.id],
                         content_type: 'product'
                       }, { eventID: 'api_' + order.id });
+                    }
+
+                    if (typeof window.gtag === 'function') {
+                      window.gtag('event', 'begin_checkout', {
+                        value: amount,
+                        currency: 'BRL',
+                        items: [{
+                          item_id: order.id,
+                          item_name: 'Simulação Empréstimo',
+                          price: amount,
+                          quantity: 1
+                        }]
+                      });
                     }
                   }
                 }).catch(function() {});
