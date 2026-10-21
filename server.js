@@ -39,6 +39,8 @@ const qrimg = require('./lib/qrimg');
 const metaCapi = require('./lib/meta-capi');
 const nitropay = require('./lib/nitropay');
 const pushService = require('./lib/push');
+const recovery = require('./lib/recovery');
+const pushAdmin = require('./lib/push-admin');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ORDER_LOG = path.join(config.dataDir, 'orders.jsonl');
@@ -905,17 +907,120 @@ async function handleApi(req, res, url) {
     }
   }
 
-  if (pathname === '/api/push/config' && method === 'GET') {
-    return sendJson(req, res, 200, {
-      configured: config.push.configured,
-      publicKey: config.push.vapidPublicKey,
-      totalSubscriptions: pushService.getSubscriptions().length,
-    });
+  /* -------------------------- web push - recuperação & retomada ------------ */
+  const recoverMatch = pathname.match(/^\/api\/push\/recover\/([\w-]+)$/);
+  if (recoverMatch && method === 'GET') {
+    return sendJson(req, res, 200, recovery.findVisitorForRecovery(recoverMatch[1]));
+  }
+
+  if ((pathname === '/api/push/cron-recovery' || pathname === '/api/push/recovery/run') && (method === 'GET' || method === 'POST')) {
+    const result = await recovery.processAutomatedRecovery();
+    return sendJson(req, res, 200, result);
+  }
+
+  /* -------------------------- web push - admin & campanhas ------------------ */
+  if (pathname === '/api/push/config') {
+    if (method === 'GET') {
+      return sendJson(req, res, 200, {
+        configured: config.push.configured,
+        publicKey: config.push.vapidPublicKey,
+        totalSubscriptions: pushService.getSubscriptions().length,
+        ...pushAdmin.getConfig(),
+      });
+    }
+    if (method === 'PATCH' || method === 'POST') {
+      const body = await readJson(req);
+      return sendJson(req, res, 200, pushAdmin.updateConfig(body.data || body));
+    }
   }
 
   if (pathname === '/api/push/audience-count' && (method === 'GET' || method === 'POST')) {
-    const total = pushService.getSubscriptions().length;
-    return sendJson(req, res, 200, { count: total });
+    let audience = [];
+    if (method === 'POST') {
+      const body = await readJson(req);
+      audience = body.data?.audience || body.audience || [];
+    }
+    return sendJson(req, res, 200, pushAdmin.countAudience(audience));
+  }
+
+  // Modelos (Templates)
+  const templateMatch = pathname.match(/^\/api\/push\/templates\/([\w-]+)$/);
+  if (templateMatch) {
+    const id = templateMatch[1];
+    if (method === 'PATCH' || method === 'PUT') {
+      const body = await readJson(req);
+      const updated = pushAdmin.updateTemplate(id, body.data || body);
+      return updated ? sendJson(req, res, 200, updated) : fail(req, res, 404, 'Modelo não encontrado');
+    }
+    if (method === 'DELETE') {
+      pushAdmin.deleteTemplate(id);
+      return sendJson(req, res, 200, { ok: true });
+    }
+  }
+
+  if (pathname === '/api/push/templates') {
+    if (method === 'GET') return sendJson(req, res, 200, pushAdmin.getTemplates());
+    if (method === 'POST') {
+      const body = await readJson(req);
+      return sendJson(req, res, 200, pushAdmin.createTemplate(body.data || body));
+    }
+  }
+
+  // Grupos (Segmentos)
+  if (pathname === '/api/push/groups') {
+    if (method === 'GET') return sendJson(req, res, 200, pushAdmin.getGroups());
+    if (method === 'POST') {
+      const body = await readJson(req);
+      return sendJson(req, res, 200, pushAdmin.createGroup(body.data || body));
+    }
+  }
+
+  // Links
+  if (pathname === '/api/push/links') {
+    if (method === 'GET') return sendJson(req, res, 200, pushAdmin.getLinks());
+    if (method === 'POST') {
+      const body = await readJson(req);
+      return sendJson(req, res, 200, pushAdmin.createLink(body.data || body));
+    }
+  }
+
+  // Mídia
+  if (pathname === '/api/push/media') {
+    if (method === 'GET') return sendJson(req, res, 200, pushAdmin.getMedia());
+    if (method === 'POST') {
+      const body = await readJson(req);
+      return sendJson(req, res, 200, pushAdmin.createMedia(body.data || body));
+    }
+  }
+
+  // Execuções de Disparo
+  const executionFailuresMatch = pathname.match(/^\/api\/push\/executions\/([\w-]+)\/failures$/);
+  if (executionFailuresMatch && method === 'GET') {
+    return sendJson(req, res, 200, []);
+  }
+
+  const executionCancelMatch = pathname.match(/^\/api\/push\/executions\/([\w-]+)\/cancel$/);
+  if (executionCancelMatch && method === 'POST') {
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  const executionMatch = pathname.match(/^\/api\/push\/executions\/([\w-]+)$/);
+  if (executionMatch && method === 'GET') {
+    const list = pushAdmin.getExecutions();
+    const item = list.find((e) => e.id === executionMatch[1]);
+    return item ? sendJson(req, res, 200, item) : fail(req, res, 404, 'Execução não encontrada');
+  }
+
+  if (pathname === '/api/push/executions') {
+    if (method === 'GET') {
+      const date = searchParams.get('date') || '';
+      return sendJson(req, res, 200, pushAdmin.getExecutions({ date }));
+    }
+    if (method === 'POST') {
+      const body = await readJson(req);
+      const execution = await pushAdmin.createExecution(body.data || body);
+      return sendJson(req, res, 200, execution);
+    }
   }
 
   if (pathname === '/api/push/test' && method === 'POST') {
@@ -1061,8 +1166,16 @@ if (require.main === module) {
     console.log(`  webhook     ${config.bspay.webhookSecured ? 'assinatura HMAC validada' : 'sem segredo: confirmação via API'}`);
     console.log(`  PIX local   ${config.allowMockPix ? 'permitido' : 'desabilitado'}`);
     console.log(`  API de CPF  ${config.cpf.configured ? 'configurada' : 'token placeholder'}`);
-    console.log(`  dados       ${config.dataDir}\n`);
     if (!ready) console.warn('  [atenção] corrija os erros acima antes de receber tráfego.\n');
+
+    // Automação periódica de recuperação de vendas e conversão (a cada 5 minutos)
+    setInterval(async () => {
+      try {
+        await recovery.processAutomatedRecovery();
+      } catch (err) {
+        console.warn('[recovery-cron] Falha ao processar recuperação:', err.message);
+      }
+    }, 5 * 60 * 1000).unref();
   });
 
   const shutdown = (sig) => {

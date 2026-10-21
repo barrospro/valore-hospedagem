@@ -10,5 +10,11 @@
   ],
   "rewrites": [
     { "source": "/((?!api|assets|images|favicon.svg|pix-106.svg|.*\\..*).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/push/cron-recovery",
+      "schedule": "*/10 * * * *"
+    }
   ]
 }
