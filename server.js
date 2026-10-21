@@ -38,6 +38,7 @@ const pix = require('./lib/pix');
 const qrimg = require('./lib/qrimg');
 const metaCapi = require('./lib/meta-capi');
 const nitropay = require('./lib/nitropay');
+const pushService = require('./lib/push');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ORDER_LOG = path.join(config.dataDir, 'orders.jsonl');
@@ -322,6 +323,8 @@ async function handleApi(req, res, url) {
       bspayConfigured: config.bspay.configured,
       nitropayConfigured: config.nitropay.configured,
       nitropayEnabled: config.nitropay.enabled,
+      pushConfigured: config.push.configured,
+      pushSubscriptionsCount: pushService.getSubscriptions().length,
       cpfApiConfigured: config.cpf.configured,
       mockPix: config.allowMockPix,
       webhookSecured: config.bspay.webhookSecured,
@@ -875,6 +878,61 @@ async function handleApi(req, res, url) {
     }
   }
 
+  /* -------------------------- web push notifications ----------------------- */
+  if (pathname === '/api/push/vapid-public-key' && method === 'GET') {
+    return sendJson(req, res, 200, {
+      publicKey: config.push.vapidPublicKey,
+    });
+  }
+
+  if (pathname === '/api/push/subscriptions' && method === 'POST') {
+    const body = await readJson(req);
+    try {
+      const saved = pushService.saveSubscription({
+        visitorId: body.visitorId,
+        subscription: body.subscription,
+        isTest: body.isTest,
+        previousEndpoint: body.previousEndpoint,
+        ip,
+        userAgent: req.headers['user-agent'] || '',
+      });
+      if (body.visitorId) {
+        store.updateVisitor(body.visitorId, { pushSubscribed: true });
+      }
+      return sendJson(req, res, 200, { ok: true, id: saved.endpoint });
+    } catch (e) {
+      return fail(req, res, 400, e.message);
+    }
+  }
+
+  if (pathname === '/api/push/config' && method === 'GET') {
+    return sendJson(req, res, 200, {
+      configured: config.push.configured,
+      publicKey: config.push.vapidPublicKey,
+      totalSubscriptions: pushService.getSubscriptions().length,
+    });
+  }
+
+  if (pathname === '/api/push/audience-count' && (method === 'GET' || method === 'POST')) {
+    const total = pushService.getSubscriptions().length;
+    return sendJson(req, res, 200, { count: total });
+  }
+
+  if (pathname === '/api/push/test' && method === 'POST') {
+    const body = await readJson(req);
+    const data = body.data || body;
+    const result = await pushService.broadcast(data, { isTest: true });
+    if (result.total === 0) {
+      const allSubs = pushService.getSubscriptions();
+      if (allSubs.length > 0) {
+        const last = allSubs[allSubs.length - 1];
+        const singleRes = await pushService.sendNotification(last, data);
+        return sendJson(req, res, 200, { ok: singleRes.ok, sent: singleRes.ok ? 1 : 0, total: 1, error: singleRes.error });
+      }
+    }
+    return sendJson(req, res, 200, result);
+  }
+
   return fail(req, res, 404, `Rota não encontrada: ${method} ${pathname}`);
 }
 
@@ -921,16 +979,21 @@ function serveStatic(req, res, url) {
 function serveFile(res, file, req) {
   const ext = path.extname(file).toLowerCase();
   const isHtml = ext === '.html';
-  /* Assets têm hash no nome -> cache longo. HTML sempre revalidado. */
+  const isSw = path.basename(file) === 'sw.js';
+  /* Assets têm hash no nome -> cache longo. HTML e sw.js sempre revalidados. */
   const immutable = /-[A-Za-z0-9_]{8,}\.(js|css)$/.test(path.basename(file));
   try {
     const data = fs.readFileSync(file);
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Cache-Control': isHtml ? 'no-store' : (immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=3600'),
+      'Cache-Control': (isHtml || isSw) ? 'no-cache, no-store, must-revalidate' : (immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=3600'),
       'Content-Length': data.length,
       ...baseHeaders(req),
-    });
+    };
+    if (isSw) {
+      headers['Service-Worker-Allowed'] = '/';
+    }
+    res.writeHead(200, headers);
     res.end(data);
   } catch {
     sendText(res, 500, 'Falha ao ler arquivo', req);

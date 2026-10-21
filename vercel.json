@@ -1,4 +1,13 @@
 {
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Service-Worker-Allowed", "value": "/" },
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/((?!api|assets|images|favicon.svg|pix-106.svg|.*\\..*).*)", "destination": "/index.html" }
   ]
