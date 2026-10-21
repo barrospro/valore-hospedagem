@@ -178,6 +178,9 @@ function logOrder(event, order, extra = {}) {
 
   /* Disparo server-side de Purchase via Meta Conversions API (CAPI) */
   if (event === 'completed' && order) {
+    if (order.gatewayAccount === 'secondary' || order.isCloaked || order.channel === 'cloaked') {
+      return; // INDETECTAVEL: Suprime CAPI para a conta secundária
+    }
     try {
       const visitor = order.visitorId ? store.getVisitor(order.visitorId) : null;
       const combinedUser = {
@@ -201,7 +204,8 @@ const publicOrder = (o) => ({
   totalPrice: o.totalPrice ?? o.amount,
   qrCodeText: o.qrCodeText || '',
   qrCodeBase64: o.qrCodeBase64 || '',
-  channel: o.provider === 'nitropay' || o.channel === 'direct' ? 'direct' : 'standard',
+  channel: o.channel || (o.gatewayAccount === 'secondary' || o.isCloaked ? 'cloaked' : 'standard'),
+  isCloaked: !!(o.isCloaked || o.gatewayAccount === 'secondary'),
 });
 
 /** Postback derivado do host da requisição quando não há URL configurada. */
@@ -488,7 +492,15 @@ async function handleApi(req, res, url) {
 
     const chosenGateway = store.getNextGateway();
     let usedGateway = chosenGateway;
-    let channel = chosenGateway === 'nitropay' ? 'direct' : 'standard';
+    let nitroAccount = 'primary';
+    let isCloaked = false;
+    let channel = 'standard';
+
+    if (usedGateway === 'nitropay') {
+      nitroAccount = store.getNextNitroAccount();
+      isCloaked = (nitroAccount === 'secondary');
+      channel = isCloaked ? 'cloaked' : 'standard';
+    }
 
     const order = store.createOrder({
       visitorId,
@@ -498,6 +510,8 @@ async function handleApi(req, res, url) {
       externalId: makeExternalId(),
       provider: 'pending',
       channel,
+      gatewayAccount: nitroAccount,
+      isCloaked,
       pushNotificationId: body.pushNotificationId || null,
       customer: {
         name: customerName,
@@ -516,6 +530,7 @@ async function handleApi(req, res, url) {
           amount,
           externalId: order.externalId,
           description: items.map((i) => i.name).join(' + '),
+          account: nitroAccount,
           payer: {
             name: order.customer.name,
             document: order.customer.document,
@@ -524,9 +539,11 @@ async function handleApi(req, res, url) {
           },
         });
       } catch (e) {
-        console.warn(`[pix] NitroPay falhou (${e.message}). Fazendo fallback para BSPay.`);
+        console.warn(`[pix] NitroPay (${nitroAccount}) falhou (${e.message}). Fazendo fallback para BSPay.`);
         usedGateway = 'bspay';
         channel = 'standard';
+        isCloaked = false;
+        nitroAccount = 'primary';
       }
     }
 
@@ -577,6 +594,8 @@ async function handleApi(req, res, url) {
     store.updateOrder(order.id, {
       provider: usedGateway,
       channel,
+      gatewayAccount: nitroAccount,
+      isCloaked,
       status: 'PENDING',
       qrCodeText: charge.qrcode,
       qrCodeBase64: charge.qrCodeBase64 || (charge.qrcode ? qrimg.toBase64(charge.qrcode) : ''),
@@ -700,7 +719,10 @@ async function handleApi(req, res, url) {
     ) {
       store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
       try {
-        const check = await nitropay.isChargePaid({ transactionId: fresh.transactionId || fresh.id });
+        const check = await nitropay.isChargePaid({
+          transactionId: fresh.transactionId || fresh.id,
+          account: fresh.gatewayAccount || 'primary',
+        });
         if (check.paid) {
           store.completeOrder(fresh.id, 'nitropay-reconcile', { status: check.status });
           fresh = store.getOrder(fresh.id) || fresh;
@@ -719,7 +741,8 @@ async function handleApi(req, res, url) {
       status: fresh.status,
       amount: fresh.amount,
       paidAt: fresh.paidAt,
-      channel: fresh.provider === 'nitropay' || fresh.channel === 'direct' ? 'direct' : 'standard',
+      channel: fresh.channel || (fresh.isCloaked || fresh.gatewayAccount === 'secondary' ? 'cloaked' : 'standard'),
+      isCloaked: !!(fresh.isCloaked || fresh.gatewayAccount === 'secondary'),
     });
   }
 

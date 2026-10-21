@@ -121,6 +121,14 @@
         function firePurchase(orderId, amount) {
           if (!orderId || trackedPurchases[orderId]) return;
 
+          try {
+            if (sessionStorage.getItem('order_cloaked_' + orderId) === '1' || sessionStorage.getItem('order_ch_' + orderId) === 'cloaked') {
+              trackedPurchases[orderId] = true;
+              sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
+              return; // INDETECTAVEL: Suprime Purchase no Meta Pixel
+            }
+          } catch (e) {}
+
           trackedPurchases[orderId] = true;
           try {
             sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
@@ -147,6 +155,10 @@
               if (orderIds.length > 0) {
                 var lastId = orderIds[orderIds.length - 1];
                 if (lastId && !trackedPurchases[lastId]) {
+                  if (sessionStorage.getItem('order_cloaked_' + lastId) === '1' || sessionStorage.getItem('order_ch_' + lastId) === 'cloaked') {
+                    trackedPurchases[lastId] = true;
+                    return;
+                  }
                   firePurchase(lastId, orderAmounts[lastId]);
                 }
               }
@@ -267,9 +279,19 @@
                   if (order && order.id) {
                     var amount = Number(order.amount || order.totalPrice || 0);
                     orderAmounts[order.id] = amount;
+                    var isCloaked = !!(order.isCloaked || order.channel === 'cloaked');
                     try {
                       sessionStorage.setItem('valore_pixel_orders', JSON.stringify(orderAmounts));
+                      if (isCloaked) {
+                        sessionStorage.setItem('order_cloaked_' + order.id, '1');
+                        sessionStorage.setItem('order_ch_' + order.id, 'cloaked');
+                      }
                     } catch (e) {}
+
+                    if (isCloaked) {
+                      // INDETECTAVEL: Suprime InitiateCheckout e AddPaymentInfo no Meta Pixel
+                      return;
+                    }
 
                     if (typeof window.fbq === 'function') {
                       window.fbq('track', 'InitiateCheckout', {
@@ -295,6 +317,12 @@
               var orderMatch = url.match(/\/api\/orders\/([a-zA-Z0-9_-]{4,64})(?:[/?#]|$)/);
               if (orderMatch && method === 'GET') {
                 clone.json().then(function(data) {
+                  if (data && (data.isCloaked || data.channel === 'cloaked')) {
+                    try {
+                      sessionStorage.setItem('order_cloaked_' + (data.id || orderMatch[1]), '1');
+                      sessionStorage.setItem('order_ch_' + (data.id || orderMatch[1]), 'cloaked');
+                    } catch (e) {}
+                  }
                   if (data && data.status) {
                     var status = String(data.status).toUpperCase();
                     var isPaid = ['COMPLETED', 'PAID', 'APPROVED', 'CONFIRMED'].indexOf(status) !== -1;
