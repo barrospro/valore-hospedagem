@@ -1049,7 +1049,8 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/push/test' && method === 'POST') {
     const body = await readJson(req);
     const data = body.data || body;
-    const result = await pushService.broadcast(data, { isTest: true });
+    const isTestFilter = body.isTest !== undefined ? Boolean(body.isTest) : null;
+    const result = await pushService.broadcast(data, { isTest: isTestFilter });
     if (result.total === 0) {
       const allSubs = pushService.getSubscriptions();
       if (allSubs.length > 0) {
