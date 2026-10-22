@@ -42,6 +42,7 @@ const nitropay = require('./lib/nitropay');
 const pushService = require('./lib/push');
 const recovery = require('./lib/recovery');
 const pushAdmin = require('./lib/push-admin');
+const utmify = require('./lib/utmify');
 
 let isRunningAutoRecovery = false;
 let lastAutoRecoveryRun = 0;
@@ -670,9 +671,13 @@ async function handleApi(req, res, url) {
       expiresAt: charge.expiresAt || null,
       postbackUrl: charge.postbackUrl || null,
     });
-    logOrder('charged', store.getOrder(order.id));
+    const freshOrder = store.getOrder(order.id);
+    logOrder('charged', freshOrder);
+    if (usedGateway === 'quantumpay') {
+      utmify.notifyPixGenerated(freshOrder, visitor).catch(() => {});
+    }
     triggerAutoRecoveryThrottled();
-    return sendJson(req, res, 200, { configured: true, order: publicOrder(store.getOrder(order.id)) });
+    return sendJson(req, res, 200, { configured: true, order: publicOrder(freshOrder) });
   }
 
   /* ------------------------------ status da ordem --------------------------- */
@@ -799,6 +804,35 @@ async function handleApi(req, res, url) {
         }
       } catch (e) {
         console.warn('[nitropay-reconcile] falha:', e.message);
+      }
+      fresh = store.getOrder(order.id) || fresh;
+    }
+
+    /* Reconciliação: pendente + QuantumPay configurada */
+    if (
+      fresh.status === 'PENDING'
+      && fresh.provider === 'quantumpay'
+      && config.quantumpay.configured
+      && (fresh.transactionId || fresh.id)
+      && (ageMs > 3000 || !fresh.createdAt)
+      && Date.now() - (fresh.lastReconcileAt || 0) > 3000
+    ) {
+      store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
+      try {
+        const check = await quantumpay.isChargePaid({
+          transactionId: fresh.transactionId || fresh.id,
+        });
+        if (check.paid) {
+          store.completeOrder(fresh.id, 'quantumpay-reconcile', { status: check.status });
+          fresh = store.getOrder(fresh.id) || fresh;
+          fresh.status = 'COMPLETED';
+          fresh.paidAt = fresh.paidAt || check.tx?.paidAt || new Date().toISOString();
+          logOrder('completed', fresh, { source: 'quantumpay-reconcile', payer: check.tx?.customer });
+          const v = fresh.visitorId ? store.getVisitor(fresh.visitorId) : null;
+          utmify.notifyPixPaid(fresh, v).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('[quantumpay-reconcile] falha:', e.message);
       }
       fresh = store.getOrder(order.id) || fresh;
     }
@@ -1004,6 +1038,8 @@ async function handleApi(req, res, url) {
       updated.status = 'COMPLETED';
       logOrder('completed', updated, { source: 'quantumpay-webhook', payer: data.customer });
       console.log(`[webhook-quantumpay] Pagamento confirmado para ordem ${order.id} (R$ ${order.amount})`);
+      const v = updated.visitorId ? store.getVisitor(updated.visitorId) : null;
+      utmify.notifyPixPaid(updated, v).catch(() => {});
     }
 
     return sendJson(req, res, 200, {
