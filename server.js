@@ -881,7 +881,7 @@ async function handleApi(req, res, url) {
       store.completeOrder(order.id, 'nitropay-webhook', payload);
       const updated = store.getOrder(order.id) || order;
       updated.status = 'COMPLETED';
-      updated.channel = 'direct';
+      updated.channel = order.channel || updated.channel || 'standard';
       logOrder('completed', updated, { source: 'nitropay-webhook', payer: data.customer });
       console.log(`[webhook] Pagamento confirmado para ordem ${order.id}`);
     }
