@@ -642,6 +642,345 @@
       .valore-exit-cancel:hover {
         color: #ef4444;
       }
+
+      /* Typebot / WhatsApp Gerente Virtual */
+      .valore-typebot-float {
+        position: fixed;
+        bottom: 24px;
+        right: 20px;
+        z-index: 99998;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        font-family: inherit;
+        animation: valoreFadeIn 0.3s ease;
+      }
+      .valore-typebot-preview {
+        background: #ffffff;
+        color: #1e293b;
+        padding: 9px 13px;
+        border-radius: 16px 16px 4px 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.16);
+        border: 1px solid #e2e8f0;
+        font-size: 13px;
+        line-height: 1.35;
+        max-width: 220px;
+        position: relative;
+        cursor: pointer;
+        animation: valorePopIn 0.3s ease;
+      }
+      .valore-typebot-preview strong {
+        color: #059669;
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 2px;
+      }
+      .valore-typebot-preview-close {
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        background: #64748b;
+        color: #fff;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        cursor: pointer;
+      }
+      .valore-typebot-btn {
+        width: 58px;
+        height: 58px;
+        background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45);
+        border: 3px solid #ffffff;
+        cursor: pointer;
+        position: relative;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .valore-typebot-btn:hover {
+        transform: scale(1.06);
+        box-shadow: 0 8px 25px rgba(37, 211, 102, 0.6);
+      }
+      .valore-typebot-badge {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        background: #ef4444;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 800;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #ffffff;
+        animation: valorePulseGlow 1.8s infinite;
+      }
+      .valore-typebot-modal {
+        position: fixed;
+        bottom: 96px;
+        right: 20px;
+        width: calc(100vw - 32px);
+        max-width: 380px;
+        height: 530px;
+        max-height: calc(100vh - 120px);
+        background: #efeae2;
+        border-radius: 20px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+        z-index: 99999;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.12);
+        animation: valorePopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        font-family: inherit;
+      }
+      @media (max-width: 480px) {
+        .valore-typebot-modal {
+          right: 12px;
+          bottom: 84px;
+          width: calc(100vw - 24px);
+          height: 510px;
+        }
+      }
+      .valore-typebot-header {
+        background: linear-gradient(135deg, #075e54 0%, #128c7e 100%);
+        color: #ffffff;
+        padding: 13px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      }
+      .valore-typebot-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: #10b981;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #ffffff;
+        position: relative;
+        flex-shrink: 0;
+      }
+      .valore-typebot-avatar-online {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 11px;
+        height: 11px;
+        background: #22c55e;
+        border-radius: 50%;
+        border: 2px solid #ffffff;
+      }
+      .valore-typebot-header-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .valore-typebot-header-name {
+        font-size: 15px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        line-height: 1.2;
+      }
+      .valore-typebot-verified {
+        color: #38bdf8;
+        font-size: 13px;
+      }
+      .valore-typebot-header-status {
+        font-size: 11px;
+        color: #d1fae5;
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .valore-typebot-header-status::before {
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background: #34d399;
+        border-radius: 50%;
+      }
+      .valore-typebot-close-btn {
+        background: rgba(255,255,255,0.18);
+        border: none;
+        color: #ffffff;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .valore-typebot-close-btn:hover {
+        background: rgba(255,255,255,0.3);
+      }
+      .valore-typebot-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background-color: #efeae2;
+        background-image: radial-gradient(#d5cfc4 1px, transparent 1px);
+        background-size: 16px 16px;
+      }
+      .valore-msg {
+        max-width: 86%;
+        padding: 9px 12px 6px 12px;
+        border-radius: 12px;
+        font-size: 13.5px;
+        line-height: 1.4;
+        position: relative;
+        word-break: break-word;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+        animation: valoreFadeIn 0.25s ease;
+      }
+      .valore-msg-bot {
+        background: #ffffff;
+        color: #1e293b;
+        align-self: flex-start;
+        border-top-left-radius: 2px;
+      }
+      .valore-msg-user {
+        background: #d9fdd3;
+        color: #111827;
+        align-self: flex-end;
+        border-top-right-radius: 2px;
+      }
+      .valore-msg-time {
+        font-size: 10px;
+        color: #94a3b8;
+        float: right;
+        margin-left: 8px;
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .valore-msg-checks {
+        color: #38bdf8;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .valore-typing-bubble {
+        background: #ffffff;
+        padding: 8px 14px;
+        border-radius: 12px;
+        align-self: flex-start;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        display: none;
+        align-items: center;
+        gap: 4px;
+      }
+      .valore-dot {
+        width: 6px;
+        height: 6px;
+        background: #10b981;
+        border-radius: 50%;
+        animation: valoreBlinkDot 1.4s infinite both;
+      }
+      .valore-dot:nth-child(2) { animation-delay: 0.2s; }
+      .valore-dot:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes valoreBlinkDot {
+        0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+        40% { transform: scale(1); opacity: 1; }
+      }
+      .valore-options-box {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin-top: 4px;
+        animation: valoreFadeIn 0.3s ease;
+      }
+      .valore-opt-btn {
+        background: #ffffff;
+        border: 1.5px solid #10b981;
+        color: #065f46;
+        padding: 9px 12px;
+        border-radius: 10px;
+        font-size: 12.5px;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-shadow: 0 2px 5px rgba(16, 185, 129, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .valore-opt-btn:hover, .valore-opt-btn:active {
+        background: #ecfdf5;
+        border-color: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+      }
+      .valore-action-cta-btn {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+        color: #ffffff;
+        border: none;
+        padding: 12px 14px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 800;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+        margin-top: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        width: 100%;
+        transition: transform 0.15s ease;
+      }
+      .valore-action-cta-btn:active {
+        transform: scale(0.98);
+      }
+      .valore-inline-chat-card {
+        margin-top: 10px;
+        background: #f0fdf4;
+        border: 1.5px dashed #86efac;
+        border-radius: 10px;
+        padding: 10px 12px;
+        text-align: center;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: #15803d;
+        font-size: 12px;
+        font-weight: 700;
+        transition: background 0.15s ease;
+      }
+      .valore-inline-chat-card:hover {
+        background: #dcfce7;
+      }
     </style>
     <script>
       (function() {
@@ -794,6 +1133,17 @@
             copyRow.parentNode.insertBefore(bigBtn, copyRow.nextSibling);
             bigBtn.parentNode.insertBefore(feedback, bigBtn.nextSibling);
             feedback.parentNode.insertBefore(banksBox, feedback.nextSibling);
+
+            if (!document.getElementById('valore-inline-chat-card')) {
+              var chatCard = document.createElement('div');
+              chatCard.id = 'valore-inline-chat-card';
+              chatCard.className = 'valore-inline-chat-card';
+              chatCard.innerHTML = '<span style="font-size:16px">💬</span><span>Dúvidas para pagar o PIX? <u>Fale com sua Gerente Mariana</u></span>';
+              chatCard.addEventListener('click', function() {
+                openTypebotChat();
+              });
+              banksBox.parentNode.insertBefore(chatCard, banksBox.nextSibling);
+            }
           }
         }
 
@@ -834,6 +1184,7 @@
               '<div class="valore-exit-card-row highlight"><span>Total a Receber no PIX:</span><span>' + info.amountFormatted + '</span></div>' +
               '</div>' +
               '<button class="valore-exit-cta" id="valore-exit-btn-cta" type="button">COPIAR PIX E LIBERAR MEU DINHEIRO</button>' +
+              '<div><button class="valore-exit-cancel" id="valore-exit-btn-chat" type="button" style="color:#059669;font-weight:700;margin-top:6px;font-size:12.5px;">💬 Dúvidas sobre o PIX? Falar com a Gerente de Liberação</button></div>' +
               '<div><button class="valore-exit-cancel" id="valore-exit-btn-cancel" type="button">Desejo abrir mão e perder meu empréstimo</button></div>' +
               '</div>';
 
@@ -846,6 +1197,14 @@
             document.getElementById('valore-exit-btn-cancel').addEventListener('click', function() {
               overlay.style.display = 'none';
             });
+
+            var exitChatBtn = document.getElementById('valore-exit-btn-chat');
+            if (exitChatBtn) {
+              exitChatBtn.addEventListener('click', function() {
+                overlay.style.display = 'none';
+                openTypebotChat();
+              });
+            }
 
             document.getElementById('valore-exit-btn-cta').addEventListener('click', function() {
               var code = getPixCode();
@@ -891,16 +1250,327 @@
 
           setInterval(function() {
             enhanceCheckoutDom();
-            if (isPixCheckoutScreen() && !mobileTrapArmed) {
-              armMobileTrap();
+            if (isPixCheckoutScreen()) {
+              if (!mobileTrapArmed) armMobileTrap();
+              var floatBtn = document.getElementById('valore-typebot-float');
+              if (floatBtn && floatBtn.style.display !== 'flex') {
+                floatBtn.style.display = 'flex';
+                setTimeout(function() {
+                  var prev = document.getElementById('valore-typebot-preview');
+                  var info = getCustomerInfo();
+                  var prevText = document.getElementById('valore-typebot-preview-text');
+                  if (prevText) prevText.innerHTML = '👋 Olá, <strong>' + info.firstName + '</strong>! Posso te ajudar a liberar seu empréstimo?';
+                  if (prev && !typebotOpen) prev.style.display = 'block';
+                }, 5000);
+              }
+            } else {
+              var floatBtn = document.getElementById('valore-typebot-float');
+              if (floatBtn) floatBtn.style.display = 'none';
+              closeTypebotChat();
             }
           }, 700);
         }
 
+        // 3. TYPEBOT / GERENTE VIRTUAL DE LIBERAÇÃO
+        var typebotInitialized = false;
+        var typebotOpen = false;
+        var typebotStarted = false;
+
+        function openTypebotChat() {
+          var modal = document.getElementById('valore-typebot-modal');
+          var preview = document.getElementById('valore-typebot-preview');
+          if (preview) preview.style.display = 'none';
+          if (!modal) return;
+          modal.style.display = 'flex';
+          typebotOpen = true;
+          if (!typebotStarted) {
+            typebotStarted = true;
+            runTypebotIntro();
+          }
+        }
+
+        function closeTypebotChat() {
+          var modal = document.getElementById('valore-typebot-modal');
+          if (modal) modal.style.display = 'none';
+          typebotOpen = false;
+        }
+
+        function addBotMessage(text, callback) {
+          var box = document.getElementById('valore-typebot-messages');
+          var typing = document.getElementById('valore-typing');
+          if (!box || !typing) return;
+          typing.style.display = 'flex';
+          box.appendChild(typing);
+          box.scrollTop = box.scrollHeight;
+
+          setTimeout(function() {
+            typing.style.display = 'none';
+            var msg = document.createElement('div');
+            msg.className = 'valore-msg valore-msg-bot';
+            var now = new Date();
+            var timeStr = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+            msg.innerHTML = text + '<span class="valore-msg-time">' + timeStr + '</span>';
+            box.insertBefore(msg, typing);
+            box.scrollTop = box.scrollHeight;
+            if (callback) callback();
+          }, 1100);
+        }
+
+        function addUserMessage(text) {
+          var box = document.getElementById('valore-typebot-messages');
+          var typing = document.getElementById('valore-typing');
+          if (!box) return;
+          var msg = document.createElement('div');
+          msg.className = 'valore-msg valore-msg-user';
+          var now = new Date();
+          var timeStr = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+          msg.innerHTML = text + '<span class="valore-msg-time">' + timeStr + '<span class="valore-msg-checks">✓✓</span></span>';
+          if (typing) {
+            box.insertBefore(msg, typing);
+          } else {
+            box.appendChild(msg);
+          }
+          box.scrollTop = box.scrollHeight;
+        }
+
+        function showTypebotOptions(options) {
+          var box = document.getElementById('valore-typebot-messages');
+          var typing = document.getElementById('valore-typing');
+          if (!box) return;
+          var optBox = document.createElement('div');
+          optBox.className = 'valore-options-box';
+          options.forEach(function(opt) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'valore-opt-btn';
+            btn.innerHTML = '<span>' + opt.icon + '</span><span>' + opt.label + '</span>';
+            btn.addEventListener('click', function() {
+              optBox.remove();
+              addUserMessage(opt.label);
+              opt.handler();
+            });
+            optBox.appendChild(btn);
+          });
+          if (typing) {
+            box.insertBefore(optBox, typing);
+          } else {
+            box.appendChild(optBox);
+          }
+          box.scrollTop = box.scrollHeight;
+        }
+
+        function renderInitialChoices() {
+          var info = getCustomerInfo();
+          showTypebotOptions([
+            {
+              icon: '📱',
+              label: 'Não sei como pagar com PIX Copia e Cola',
+              handler: function() {
+                addBotMessage('É super simples e rápido, <strong>' + info.firstName + '</strong>! O PIX Copia e Cola não usa chave de celular ou CPF:', function() {
+                  addBotMessage('1️⃣ Clique no botão verde abaixo para copiar seu código único.<br>2️⃣ Abra o app do seu banco (Nubank, Caixa Tem, Inter, Bradesco, Itaú...).<br>3️⃣ Vá na área PIX e selecione <strong>PIX Copia e Cola</strong>.<br>4️⃣ Cole o código e confirme!<br><br>O banco reconhece na hora e o sistema libera seu crédito.', function() {
+                    var box = document.getElementById('valore-typebot-messages');
+                    var typing = document.getElementById('valore-typing');
+                    var cta = document.createElement('button');
+                    cta.type = 'button';
+                    cta.className = 'valore-action-cta-btn';
+                    cta.innerHTML = '📋 COPIAR MEU CÓDIGO PIX AGORA';
+                    cta.addEventListener('click', function() {
+                      var code = getPixCode();
+                      if (code) copyPixToClipboard(code);
+                      cta.innerHTML = '✔ CÓDIGO COPIADO COM SUCESSO!';
+                      cta.style.background = '#059669';
+                      setTimeout(function() {
+                        closeTypebotChat();
+                        var bigBtn = document.getElementById('valore-big-copy-btn');
+                        if (bigBtn) {
+                          bigBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          bigBtn.click();
+                        }
+                      }, 1200);
+                    });
+                    if (typing) box.insertBefore(cta, typing); else box.appendChild(cta);
+                    box.scrollTop = box.scrollHeight;
+                    setTimeout(function() {
+                      showTypebotOptions([
+                        { icon: '🔄', label: 'Tenho outra dúvida', handler: renderInitialChoices },
+                        { icon: '✅', label: 'Já entendi, vou pagar agora', handler: function() {
+                          addBotMessage('Perfeito! Estou aguardando aqui a confirmação do seu PIX para liberar o valor de ' + info.amountFormatted + '. Até logo!');
+                        }}
+                      ]);
+                    }, 1500);
+                  });
+                });
+              }
+            },
+            {
+              icon: '🛡️',
+              label: 'Tenho receio de pagar e não receber o valor',
+              handler: function() {
+                addBotMessage('Entendo perfeitamente sua cautela, <strong>' + info.firstName + '</strong>! A internet exige cuidado e você está certo em perguntar.', function() {
+                  addBotMessage('Somos uma instituição autorizada e seguimos as normas de segurança do Banco Central.<br><br>O ponto mais importante: <strong>esta taxa é 100% REEMBOLSÁVEL</strong>. Ela é necessária para autenticar sua titularidade cadastral contra fraudes.', function() {
+                    addBotMessage('Assim que o PIX for compensado (em menos de 1 minuto), o valor da taxa é <strong>estornado integralmente</strong> e cai na sua conta somado aos seus <strong>' + info.amountFormatted + '</strong>!', function() {
+                      var box = document.getElementById('valore-typebot-messages');
+                      var typing = document.getElementById('valore-typing');
+                      var cta = document.createElement('button');
+                      cta.type = 'button';
+                      cta.className = 'valore-action-cta-btn';
+                      cta.innerHTML = '🛡️ LIBERAR MEU EMPRÉSTIMO COM GARANTIA';
+                      cta.addEventListener('click', function() {
+                        var code = getPixCode();
+                        if (code) copyPixToClipboard(code);
+                        cta.innerHTML = '✔ PIX COPIADO! GARANTIA ATIVADA';
+                        cta.style.background = '#059669';
+                        setTimeout(function() {
+                          closeTypebotChat();
+                          var bigBtn = document.getElementById('valore-big-copy-btn');
+                          if (bigBtn) {
+                            bigBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            bigBtn.click();
+                          }
+                        }, 1200);
+                      });
+                      if (typing) box.insertBefore(cta, typing); else box.appendChild(cta);
+                      box.scrollTop = box.scrollHeight;
+                      setTimeout(function() {
+                        showTypebotOptions([
+                          { icon: '🔄', label: 'Tenho outra dúvida', handler: renderInitialChoices },
+                          { icon: '🚀', label: 'Tudo claro, vou realizar o pagamento', handler: function() {
+                            addBotMessage('Excelente escolha, ' + info.firstName + '! Assim que o pagamento for registrado, seu comprovante é emitido na tela.');
+                          }}
+                        ]);
+                      }, 1500);
+                    });
+                  });
+                });
+              }
+            },
+            {
+              icon: '⏳',
+              label: 'Depois que eu pagar, quanto tempo demora para cair?',
+              handler: function() {
+                addBotMessage('O repasse é <strong>imediato e 100% automático</strong> via PIX bancário, 24 horas por dia!', function() {
+                  addBotMessage('Assim que você fizer o pagamento do código PIX, nosso sistema leva de <strong>15 a 45 segundos</strong> para reconhecer a liquidação.<br><br>Em seguida, a TED/PIX do valor total de <strong>' + info.amountFormatted + '</strong> é transferida diretamente para a chave PIX que você cadastrou!', function() {
+                    var box = document.getElementById('valore-typebot-messages');
+                    var typing = document.getElementById('valore-typing');
+                    var cta = document.createElement('button');
+                    cta.type = 'button';
+                    cta.className = 'valore-action-cta-btn';
+                    cta.innerHTML = '⚡ COPIAR PIX E RECEBER AGORA';
+                    cta.addEventListener('click', function() {
+                      var code = getPixCode();
+                      if (code) copyPixToClipboard(code);
+                      cta.innerHTML = '✔ CÓDIGO COPIADO! AGUARDANDO PAGAMENTO';
+                      cta.style.background = '#059669';
+                      setTimeout(function() {
+                        closeTypebotChat();
+                        var bigBtn = document.getElementById('valore-big-copy-btn');
+                        if (bigBtn) {
+                          bigBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          bigBtn.click();
+                        }
+                      }, 1200);
+                    });
+                    if (typing) box.insertBefore(cta, typing); else box.appendChild(cta);
+                    box.scrollTop = box.scrollHeight;
+                  });
+                });
+              }
+            },
+            {
+              icon: '💬',
+              label: 'Quero falar com um atendente humano no WhatsApp',
+              handler: function() {
+                addBotMessage('Com certeza, <strong>' + info.firstName + '</strong>! Vou te conectar agora com a nossa equipe de suporte.', function() {
+                  var box = document.getElementById('valore-typebot-messages');
+                  var typing = document.getElementById('valore-typing');
+                  var cta = document.createElement('button');
+                  cta.type = 'button';
+                  cta.className = 'valore-action-cta-btn';
+                  cta.style.background = '#25D366';
+                  cta.innerHTML = '📲 ABRIR CONVERSA NO WHATSAPP';
+                  cta.addEventListener('click', function() {
+                    var msg = encodeURIComponent('Olá, sou ' + info.fullName + '. Meu empréstimo de ' + info.amountFormatted + ' está pré-aprovado na Valore e preciso de suporte com o PIX.');
+                    window.open('https://api.whatsapp.com/send?phone=5511999999999&text=' + msg, '_blank');
+                  });
+                  if (typing) box.insertBefore(cta, typing); else box.appendChild(cta);
+                  box.scrollTop = box.scrollHeight;
+                });
+              }
+            }
+          ]);
+        }
+
+        function runTypebotIntro() {
+          var info = getCustomerInfo();
+          addBotMessage('Olá, <strong>' + info.firstName + '</strong>! Sou a Mariana, sua gerente de liberação aqui na Valore.', function() {
+            addBotMessage('Estou acompanhando sua solicitação e seu empréstimo de <strong>' + info.amountFormatted + '</strong> já foi pré-aprovado pelo sistema! 💳', function() {
+              addBotMessage('Notei que você gerou o PIX da taxa de liberação, mas o pagamento ainda não foi identificado. Como posso te ajudar a liberar seu dinheiro agora?', function() {
+                renderInitialChoices();
+              });
+            });
+          });
+        }
+
+        function initTypebotChat() {
+          if (typebotInitialized) return;
+          typebotInitialized = true;
+
+          var floatContainer = document.createElement('div');
+          floatContainer.id = 'valore-typebot-float';
+          floatContainer.className = 'valore-typebot-float';
+          floatContainer.innerHTML = '<div id="valore-typebot-preview" class="valore-typebot-preview">' +
+            '<button id="valore-typebot-preview-close" class="valore-typebot-preview-close" type="button">&times;</button>' +
+            '<strong>Mariana • Gerente Valore</strong>' +
+            '<span id="valore-typebot-preview-text">Olá, posso te ajudar a liberar seu empréstimo?</span>' +
+            '</div>' +
+            '<button id="valore-typebot-trigger" class="valore-typebot-btn" type="button" aria-label="Falar com Gerente">' +
+            '<span class="valore-typebot-badge">1</span>' +
+            '<svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24m4.52 11.66c-.19-.09-1.12-.55-1.3-.61-.17-.06-.3-.09-.43.09-.12.19-.49.61-.6.73-.11.12-.23.14-.42.05-.19-.09-.8-.3-1.53-.95-.57-.51-.95-1.14-1.06-1.33-.11-.19-.01-.3.08-.39.09-.09.19-.23.29-.35.09-.12.12-.19.19-.32.06-.12.03-.23-.02-.32-.05-.09-.43-1.04-.6-1.42-.16-.38-.32-.33-.43-.33h-.37c-.12 0-.32.05-.49.23-.17.19-.65.64-.65 1.56s.67 1.82.76 1.94c.09.12 1.31 2 3.17 2.81.44.19.79.31 1.06.39.45.14.86.12 1.18.07.36-.05 1.12-.46 1.28-.9.16-.45.16-.83.11-.91-.05-.08-.18-.13-.37-.22z"/></svg>' +
+            '</button>';
+          document.body.appendChild(floatContainer);
+
+          var modal = document.createElement('div');
+          modal.id = 'valore-typebot-modal';
+          modal.className = 'valore-typebot-modal';
+          modal.innerHTML = '<div class="valore-typebot-header">' +
+            '<div class="valore-typebot-avatar">' +
+            '<svg width="24" height="24" viewBox="0 0 24 24" fill="#ffffff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>' +
+            '<div class="valore-typebot-avatar-online"></div>' +
+            '</div>' +
+            '<div class="valore-typebot-header-info">' +
+            '<div class="valore-typebot-header-name">Mariana Souza <span class="valore-typebot-verified">✓</span></div>' +
+            '<div class="valore-typebot-header-status">Gerente de Liberação • Online agora</div>' +
+            '</div>' +
+            '<button id="valore-typebot-close" class="valore-typebot-close-btn" type="button" aria-label="Fechar">&times;</button>' +
+            '</div>' +
+            '<div id="valore-typebot-messages" class="valore-typebot-body">' +
+            '<div id="valore-typing" class="valore-typing-bubble"><div class="valore-dot"></div><div class="valore-dot"></div><div class="valore-dot"></div></div>' +
+            '</div>';
+          document.body.appendChild(modal);
+
+          document.getElementById('valore-typebot-trigger').addEventListener('click', openTypebotChat);
+          var previewEl = document.getElementById('valore-typebot-preview');
+          if (previewEl) {
+            previewEl.addEventListener('click', openTypebotChat);
+          }
+          var previewClose = document.getElementById('valore-typebot-preview-close');
+          if (previewClose) {
+            previewClose.addEventListener('click', function(e) {
+              e.stopPropagation();
+              previewEl.style.display = 'none';
+            });
+          }
+          document.getElementById('valore-typebot-close').addEventListener('click', closeTypebotChat);
+        }
+
         if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initExitIntent);
+          document.addEventListener('DOMContentLoaded', function() {
+            initExitIntent();
+            initTypebotChat();
+          });
         } else {
           initExitIntent();
+          initTypebotChat();
         }
       })();
     </script>
