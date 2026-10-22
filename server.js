@@ -37,6 +37,7 @@ const bspay = require('./lib/bspay');
 const pix = require('./lib/pix');
 const qrimg = require('./lib/qrimg');
 const metaCapi = require('./lib/meta-capi');
+const quantumpay = require('./lib/quantumpay');
 const nitropay = require('./lib/nitropay');
 const pushService = require('./lib/push');
 const recovery = require('./lib/recovery');
@@ -345,6 +346,8 @@ async function handleApi(req, res, url) {
       brand: config.brand.name,
       env: config.nodeEnv,
       bspayConfigured: config.bspay.configured,
+      quantumpayConfigured: config.quantumpay.configured,
+      quantumpayEnabled: config.quantumpay.enabled,
       nitropayConfigured: config.nitropay.configured,
       nitropayEnabled: config.nitropay.enabled,
       pushConfigured: config.push.configured,
@@ -564,6 +567,29 @@ async function handleApi(req, res, url) {
     logOrder('created', order);
 
     let charge;
+    if (usedGateway === 'quantumpay') {
+      try {
+        charge = await quantumpay.createPixCharge({
+          amount,
+          externalId: order.externalId,
+          description: items.map((i) => i.name).join(' + '),
+          postbackUrl: postbackFromRequest(req),
+          payer: {
+            name: order.customer.name,
+            document: order.customer.document,
+            email: order.customer.email,
+            phone: order.customer.phone,
+          },
+        });
+      } catch (e) {
+        console.warn(`[pix] QuantumPay falhou (${e.message}). Fazendo fallback para BSPay.`);
+        usedGateway = 'bspay';
+        channel = 'standard';
+        isCloaked = false;
+        nitroAccount = 'primary';
+      }
+    }
+
     if (usedGateway === 'nitropay') {
       try {
         charge = await nitropay.createPixCharge({
@@ -934,6 +960,59 @@ async function handleApi(req, res, url) {
     });
   }
 
+  /* ---------------------------- webhook quantumpay -------------------------- */
+  if ((pathname === '/api/webhooks/quantumpay' || pathname === '/api/webhooks/quantum') && method === 'POST') {
+    const raw = await readRaw(req);
+    let payload = {};
+    try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
+
+    const signature = req.headers['x-signature'] || '';
+    const verified = quantumpay.verifyWebhook(raw.toString('utf8'), signature);
+
+    const event = String(payload.event || '').toLowerCase();
+    const data = payload.data || payload;
+    const txId = data.id || payload.id;
+    const externalId = data.externalId || data.external_id || payload.externalId;
+    const status = String(data.status || payload.status || '').toLowerCase();
+
+    let order = (externalId && store.findByExternalId(externalId)) || (txId && store.findByTransactionId(txId));
+
+    if (!order && externalId) {
+      order = store.createOrder({
+        id: externalId,
+        externalId,
+        transactionId: txId || null,
+        status: 'PENDING',
+        amount: Number(data.amountInCents ? data.amountInCents / 100 : (data.amount || payload.amount || 0)),
+        totalPrice: Number(data.amountInCents ? data.amountInCents / 100 : (data.amount || payload.amount || 0)),
+        provider: 'quantumpay',
+        channel: 'standard',
+        customer: {
+          name: data.customer?.name || '',
+          document: data.customer?.document || '',
+          email: data.customer?.email || '',
+          phone: data.customer?.phone || '',
+        },
+      });
+    }
+
+    const isPaid = event === 'transaction_paid' || ['paid', 'pago', 'completed', 'approved', 'confirmado'].includes(status);
+
+    if (order && isPaid) {
+      store.completeOrder(order.id, verified ? 'quantumpay-webhook' : 'quantumpay-webhook-direct', payload);
+      const updated = store.getOrder(order.id) || order;
+      updated.status = 'COMPLETED';
+      logOrder('completed', updated, { source: 'quantumpay-webhook', payer: data.customer });
+      console.log(`[webhook-quantumpay] Pagamento confirmado para ordem ${order.id} (R$ ${order.amount})`);
+    }
+
+    return sendJson(req, res, 200, {
+      received: true,
+      orderId: order?.id || null,
+      status: order ? store.getOrder(order.id).status : 'unknown',
+    });
+  }
+
   /* ----------------------------------- CEP ---------------------------------- */
   const cepMatch = pathname.match(/^\/api\/cep\/(\d{5}-?\d{3})$/);
   if (cepMatch) {
@@ -1141,6 +1220,17 @@ async function handleApi(req, res, url) {
 
 /** Confirma a ordem consultando o gateway (usado quando não há webhook_secret). */
 async function confirmOnGateway(order, txId) {
+  if (order.provider === 'quantumpay' || config.quantumpay?.configured) {
+    try {
+      const check = await quantumpay.isChargePaid({
+        externalId: order.externalId,
+        transactionId: order.transactionId || txId,
+      });
+      if (check.paid) return true;
+    } catch (e) {
+      console.warn('[webhook] não foi possível confirmar na QuantumPay:', e.message);
+    }
+  }
   if (!config.bspay.configured) return false;
   try {
     const check = await bspay.isChargePaid({
