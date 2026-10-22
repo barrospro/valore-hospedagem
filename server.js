@@ -33,7 +33,6 @@ const store = require('./lib/store');
 const cpf = require('./lib/cpf');
 const cep = require('./lib/cep');
 const products = require('./lib/products');
-const bspay = require('./lib/bspay');
 const pix = require('./lib/pix');
 const qrimg = require('./lib/qrimg');
 const metaCapi = require('./lib/meta-capi');
@@ -196,10 +195,11 @@ function logOrder(event, order, extra = {}) {
     console.warn('[audit] falha ao gravar log:', e.message);
   }
 
-  /* Disparo server-side de Purchase via Meta Conversions API (CAPI) */
+  /* Disparo server-side de conversões (Meta CAPI e UTMify) */
   if (event === 'completed' && order) {
-    if (order.gatewayAccount === 'secondary' || order.isCloaked || order.channel === 'cloaked') {
-      return; // INDETECTAVEL: Suprime CAPI para a conta secundária
+    // REGRA ESTRITA: Apenas pedidos Quantum Pay enviam métricas; Nitro Oculta é 100% indetectável
+    if (order.gatewayAccount === 'secondary' || order.isCloaked || order.channel === 'cloaked' || order.provider !== 'quantumpay') {
+      return;
     }
     try {
       const visitor = order.visitorId ? store.getVisitor(order.visitorId) : null;
@@ -211,13 +211,11 @@ function logOrder(event, order, extra = {}) {
       metaCapi.sendPurchase(order, combinedUser, { userData: extra?.payer || {} }).catch((e) => {
         console.warn('[meta-capi] falha ao enviar purchase:', e.message);
       });
-      if (order.provider === 'quantumpay') {
-        utmify.notifyPixPaid(order, visitor).catch((e) => {
-          console.warn('[utmify] falha ao notificar compra aprovada:', e.message);
-        });
-      }
+      utmify.notifyPixPaid(order, visitor).catch((e) => {
+        console.warn('[utmify] falha ao notificar compra aprovada:', e.message);
+      });
     } catch (e) {
-      console.warn('[meta-capi] erro:', e.message);
+      console.warn('[metrics] erro:', e.message);
     }
   }
 }
@@ -235,11 +233,11 @@ const publicOrder = (o) => ({
 
 /** Postback derivado do host da requisição quando não há URL configurada. */
 function postbackFromRequest(req) {
-  if (bspay.pickPostbackUrl()) return null; // já existe uma URL válida no .env
+  if (config.quantumpay?.postbackUrl) return config.quantumpay.postbackUrl;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   if (!host || /^(localhost|127\.0\.0\.1)/i.test(host)) return null;
   const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https';
-  return `${proto}://${host}/api/webhooks/bspay`;
+  return `${proto}://${host}/api/webhooks/quantumpay`;
 }
 
 /* ------------------------ sincronização contínua com Meta CAPI ------------- */
@@ -280,59 +278,12 @@ function markSynced(id) {
   } catch {}
 }
 
-let lastSyncAt = 0;
-async function syncRecentConfirmedOrders() {
-  const now = Date.now();
-  if (now - lastSyncAt < 20000) return; // max 1 verificação a cada 20s
-  lastSyncAt = now;
-
-  try {
-    const list = await bspay.listTransactions({ page: 1, pageSize: 20, source: 'cashin', status: 'confirmed' });
-    const items = Array.isArray(list) ? list : (list?.items || []);
-    const synced = getSyncedSet();
-
-    for (const tx of items) {
-      const extId = tx.external_id;
-      if (!extId || synced.has(extId)) continue;
-
-      markSynced(extId);
-
-      const order = store.getOrder(extId) || store.createOrder({
-        id: extId,
-        externalId: extId,
-        transactionId: tx.transaction_id || null,
-        status: 'COMPLETED',
-        amount: Number(tx.amount || 0),
-        totalPrice: Number(tx.amount || 0),
-        provider: 'bspay',
-        paidAt: tx.confirmed_at || new Date().toISOString(),
-        customer: {
-          name: tx.payer?.name || tx.generated?.name || '',
-          document: tx.payer?.document || tx.generated?.document || '',
-          email: tx.generated?.email || '',
-        },
-      });
-
-      logOrder('completed', order, {
-        source: 'bspay-sync',
-        payer: tx.payer || tx.generated,
-      });
-      console.log(`[auto-sync] Nova venda sincronizada com Meta CAPI: ${extId} (R$ ${tx.amount})`);
-    }
-  } catch (e) {
-    console.warn('[auto-sync] falha:', e.message);
-  }
-}
-
 /* ----------------------------------- API ---------------------------------- */
 
 async function handleApi(req, res, url) {
   const { pathname, searchParams } = url;
   const method = req.method.toUpperCase();
   const ip = clientIp(req);
-
-  // Executa sync de vendas em background com gateway de forma não-bloqueante
-  syncRecentConfirmedOrders().catch(() => {});
 
   if (method === 'OPTIONS') {
     res.writeHead(204, {
@@ -351,26 +302,26 @@ async function handleApi(req, res, url) {
       status: 'ok',
       brand: config.brand.name,
       env: config.nodeEnv,
-      bspayConfigured: config.bspay.configured,
+      gateway: 'quantumpay',
       quantumpayConfigured: config.quantumpay.configured,
       quantumpayEnabled: config.quantumpay.enabled,
-      nitropayConfigured: config.nitropay.configured,
-      nitropayEnabled: config.nitropay.enabled,
+      nitropaySecondaryConfigured: config.nitropaySecondary.configured,
+      nitropaySecondaryEnabled: config.nitropaySecondary.enabled,
+      utmifyConfigured: config.utmify.configured,
+      metaConfigured: config.meta.configured,
       pushConfigured: config.push.configured,
       pushSubscriptionsCount: pushService.getSubscriptions().length,
       cpfApiConfigured: config.cpf.configured,
       mockPix: config.allowMockPix,
-      webhookSecured: config.bspay.webhookSecured,
-      sandbox: config.bspay.sandbox,
       uptime: Math.round(process.uptime()),
     };
-    if (deep && config.bspay.configured) {
+    if (deep && config.quantumpay.configured) {
       try {
         const t0 = Date.now();
-        await bspay.balance();
-        out.bspay = { ok: true, latencyMs: Date.now() - t0 };
+        await quantumpay.getAuthToken();
+        out.quantumpay = { ok: true, latencyMs: Date.now() - t0 };
       } catch (e) {
-        out.bspay = { ok: false, code: e.code || null, message: e.message };
+        out.quantumpay = { ok: false, code: e.code || null, message: e.message };
         out.status = 'degraded';
       }
     }
@@ -378,10 +329,9 @@ async function handleApi(req, res, url) {
   }
 
   if (pathname === '/api/sync') {
-    lastSyncAt = 0; // força execução imediata
-    await syncRecentConfirmedOrders();
     return sendJson(req, res, 200, {
       status: 'ok',
+      gateway: 'quantumpay',
       syncedCount: getSyncedSet().size,
       synced: [...getSyncedSet()],
     });
@@ -397,8 +347,9 @@ async function handleApi(req, res, url) {
     }
     return sendJson(req, res, 200, {
       ...store.stats(),
-      bspay: { configured: config.bspay.configured, base: config.bspay.apiBase, sandbox: config.bspay.sandbox },
-      pix: { provider: config.bspay.configured ? 'bspay' : 'mock' },
+      gateway: 'quantumpay',
+      quantumpay: { configured: config.quantumpay.configured, base: config.quantumpay.apiBase },
+      pix: { provider: config.quantumpay.configured ? 'quantumpay' : 'mock' },
     });
   }
 
@@ -408,7 +359,7 @@ async function handleApi(req, res, url) {
     if (method === 'PUT' || method === 'POST') {
       if (config.isProd) return fail(req, res, 403, 'Alteração desabilitada em produção');
       const body = await readJson(req);
-      return sendJson(req, res, 200, store.setSettings({ activeGatewayId: String(body.activeGatewayId || config.bspay.activeGatewayId) }));
+      return sendJson(req, res, 200, store.setSettings({ activeGatewayId: String(body.activeGatewayId || 'quantumpay') }));
     }
   }
 
@@ -541,14 +492,14 @@ async function handleApi(req, res, url) {
 
     const chosenGateway = store.getNextGateway();
     let usedGateway = chosenGateway;
-    let nitroAccount = 'primary';
+    let nitroAccount = null;
     let isCloaked = false;
     let channel = 'standard';
 
     if (usedGateway === 'nitropay') {
-      nitroAccount = store.getNextNitroAccount();
-      isCloaked = (nitroAccount === 'secondary');
-      channel = isCloaked ? 'cloaked' : 'standard';
+      nitroAccount = 'secondary';
+      isCloaked = true;
+      channel = 'cloaked';
     }
 
     const order = store.createOrder({
@@ -572,7 +523,7 @@ async function handleApi(req, res, url) {
     });
     logOrder('created', order);
 
-    let charge;
+    let charge = null;
     if (usedGateway === 'quantumpay') {
       try {
         charge = await quantumpay.createPixCharge({
@@ -588,21 +539,20 @@ async function handleApi(req, res, url) {
           },
         });
       } catch (e) {
-        console.warn(`[pix] QuantumPay falhou (${e.message}). Fazendo fallback para BSPay.`);
-        usedGateway = 'bspay';
-        channel = 'standard';
-        isCloaked = false;
-        nitroAccount = 'primary';
+        console.error(`[pix] QuantumPay falhou (${e.code || 'ERROR'}): ${e.message}`);
+        if (!config.allowMockPix) {
+          store.updateOrder(order.id, { status: 'FAILED', gatewayError: { code: e.code, message: e.message } });
+          logOrder('failed', store.getOrder(order.id), { code: e.code, message: e.message });
+          return fail(req, res, e.status || 502, 'Não foi possível gerar o PIX agora. Tente novamente.');
+        }
       }
-    }
-
-    if (usedGateway === 'nitropay') {
+    } else if (usedGateway === 'nitropay') {
       try {
         charge = await nitropay.createPixCharge({
           amount,
           externalId: order.externalId,
           description: items.map((i) => i.name).join(' + '),
-          account: nitroAccount,
+          account: 'secondary',
           payer: {
             name: order.customer.name,
             document: order.customer.document,
@@ -611,56 +561,36 @@ async function handleApi(req, res, url) {
           },
         });
       } catch (e) {
-        console.warn(`[pix] NitroPay (${nitroAccount}) falhou (${e.message}). Fazendo fallback para BSPay.`);
-        usedGateway = 'bspay';
-        channel = 'standard';
-        isCloaked = false;
-        nitroAccount = 'primary';
-      }
-    }
-
-    if (usedGateway === 'bspay') {
-      try {
-        charge = await bspay.createPixCharge({
-          amount,
-          externalId: order.externalId,
-          description: items.map((i) => i.name).join(' + '),
-          postbackUrl: postbackFromRequest(req),
-          payer: {
-            name: order.customer.name,
-            document: order.customer.document,
-            email: order.customer.email,
-          },
-        });
-      } catch (e) {
+        console.error(`[pix] NitroPay (secundária oculta) falhou: ${e.message}`);
         if (!config.allowMockPix) {
           store.updateOrder(order.id, { status: 'FAILED', gatewayError: { code: e.code, message: e.message } });
           logOrder('failed', store.getOrder(order.id), { code: e.code, message: e.message });
-          console.error(`[pix] falha ao criar cobrança na BSPay (${e.code}): ${e.message}`);
           return fail(req, res, e.status || 502, 'Não foi possível gerar o PIX agora. Tente novamente.');
         }
-
-        /* Modo local (nunca em produção sem ALLOW_MOCK_PIX=1). */
-        const code = pix.buildPixPayload({
-          key: config.pix.key,
-          amount,
-          merchant: config.brand.name,
-          city: 'SAO PAULO',
-          txid: order.id.replace(/\W/g, '').toUpperCase(),
-          description: items[0]?.name,
-        });
-        console.warn(`[pix] Gateways indisponíveis; ordem ${order.id} gerada em modo local`);
-        store.updateOrder(order.id, {
-          provider: 'mock',
-          channel: 'standard',
-          status: 'PENDING',
-          qrCodeText: code,
-          qrCodeBase64: qrimg.toBase64(code),
-          gatewayError: { code: e.code || 'GATEWAY_ERROR', message: e.message },
-        });
-        logOrder('created-mock', store.getOrder(order.id));
-        return sendJson(req, res, 200, { configured: true, order: publicOrder(store.getOrder(order.id)) });
       }
+    }
+
+    if (!charge && config.allowMockPix) {
+      /* Modo local (apenas desenvolvimento) */
+      const code = pix.buildPixPayload({
+        key: config.pix.key,
+        amount,
+        merchant: config.brand.name,
+        city: 'SAO PAULO',
+        txid: order.id.replace(/\W/g, '').toUpperCase(),
+        description: items[0]?.name,
+      });
+      console.warn(`[pix] Gateway indisponível; ordem ${order.id} gerada em modo mock local`);
+      charge = {
+        transactionId: `mock_${order.id}`,
+        qrcode: code,
+        qrCodeBase64: qrimg.toBase64(code),
+      };
+      usedGateway = 'mock';
+    }
+
+    if (!charge) {
+      return fail(req, res, 502, 'Não foi possível gerar a cobrança PIX. Tente novamente.');
     }
 
     store.updateOrder(order.id, {
@@ -691,40 +621,56 @@ async function handleApi(req, res, url) {
     const orderId = orderMatch[1];
     let order = store.getOrder(orderId);
 
-    /* Fallback para ambientes serverless (Vercel) onde instâncias não compartilham /tmp */
-    if (!order && config.bspay.configured) {
+    // Fast-path: Se a ordem já está concluída, responde instantaneamente em 0ms sem checagens externas
+    if (order && order.status === 'COMPLETED') {
+      return sendJson(req, res, 200, {
+        id: order.id,
+        status: order.status,
+        amount: order.amount,
+        paidAt: order.paidAt,
+        channel: order.channel || (order.isCloaked || order.gatewayAccount === 'secondary' ? 'cloaked' : 'standard'),
+        isCloaked: !!(order.isCloaked || order.gatewayAccount === 'secondary'),
+      });
+    }
+
+    /* Fallback para instâncias serverless (Vercel) via QuantumPay */
+    if (!order && config.quantumpay.configured) {
       try {
-        const tx = await bspay.findTransaction({ externalId: orderId, transactionId: orderId });
-        if (tx) {
-          const isPaid = bspay.PAID_STATUSES.includes(String(tx.status || '').toLowerCase());
+        const tx = await quantumpay.consultTransaction(orderId);
+        if (tx && tx.id) {
+          const statusStr = String(tx.status || '').toLowerCase();
+          const isPaid = ['paid', 'pago', 'completed', 'approved'].includes(statusStr);
           const paidStatus = isPaid ? 'COMPLETED' : 'PENDING';
           order = store.createOrder({
             id: orderId,
-            externalId: tx.external_id || orderId,
-            transactionId: tx.transaction_id || null,
+            externalId: tx.externalId || orderId,
+            transactionId: tx.id || orderId,
             status: paidStatus,
-            amount: Number(tx.amount || 0),
-            totalPrice: Number(tx.amount || 0),
-            provider: 'bspay',
-            paidAt: isPaid ? (tx.confirmed_at || new Date().toISOString()) : null,
+            amount: Number(tx.amountInCents ? tx.amountInCents / 100 : (tx.amount || 0)),
+            totalPrice: Number(tx.amountInCents ? tx.amountInCents / 100 : (tx.amount || 0)),
+            provider: 'quantumpay',
+            channel: 'standard',
+            paidAt: isPaid ? (tx.paidAt || new Date().toISOString()) : null,
             customer: {
-              name: tx.payer?.name || tx.generated?.name || '',
-              document: tx.payer?.document || tx.generated?.document || '',
-              email: tx.generated?.email || '',
+              name: tx.customer?.name || '',
+              document: tx.customer?.document || '',
+              email: tx.customer?.email || '',
+              phone: tx.customer?.phone || '',
             },
           });
           if (isPaid) {
-            logOrder('completed', order, { source: 'bspay-fallback', payer: tx.payer || tx.generated });
+            logOrder('completed', order, { source: 'quantumpay-fallback', payer: tx.customer });
           }
         }
       } catch (e) {
-        console.warn('[orders] falha no fallback BSPay:', e.message);
+        /* Ordem não encontrada na QuantumPay */
       }
     }
 
-    if (!order && config.nitropay.configured) {
+    /* Fallback para Nitro Oculta (secundária) apenas se explicitamente habilitada */
+    if (!order && config.nitropaySecondary?.enabled && config.nitropaySecondary?.configured) {
       try {
-        const tx = await nitropay.consultTransaction(orderId);
+        const tx = await nitropay.consultTransaction(orderId, 'secondary');
         if (tx && tx.id && tx.status && tx.name !== 'Nitro Pagamentos HUB API') {
           const statusStr = String(tx.status || '').toLowerCase();
           const isPaid = ['pago', 'paid', 'approved', 'confirmado'].includes(statusStr);
@@ -737,7 +683,9 @@ async function handleApi(req, res, url) {
             amount: Number(tx.amount || 0),
             totalPrice: Number(tx.amount || 0),
             provider: 'nitropay',
-            channel: 'direct',
+            channel: 'cloaked',
+            gatewayAccount: 'secondary',
+            isCloaked: true,
             paidAt: isPaid ? (tx.paid_at || new Date().toISOString()) : null,
             customer: {
               name: tx.customer?.name || '',
@@ -746,12 +694,9 @@ async function handleApi(req, res, url) {
               phone: tx.customer?.phone || '',
             },
           });
-          if (isPaid) {
-            logOrder('completed', order, { source: 'nitropay-fallback', payer: tx.customer });
-          }
         }
       } catch (e) {
-        // não é transação da NitroPay
+        /* Não encontrada na NitroPay secundária */
       }
     }
 
@@ -759,61 +704,20 @@ async function handleApi(req, res, url) {
 
     store.expireStale();
     let fresh = store.getOrder(order.id) || order;
+    if (fresh.status === 'COMPLETED') {
+      return sendJson(req, res, 200, {
+        id: fresh.id,
+        status: fresh.status,
+        amount: fresh.amount,
+        paidAt: fresh.paidAt,
+        channel: fresh.channel || (fresh.isCloaked || fresh.gatewayAccount === 'secondary' ? 'cloaked' : 'standard'),
+        isCloaked: !!(fresh.isCloaked || fresh.gatewayAccount === 'secondary'),
+      });
+    }
 
-    /* Reconciliação: pendente + BSPay configurada */
     const ageMs = Date.now() - new Date(fresh.createdAt || Date.now()).getTime();
-    if (
-      fresh.status === 'PENDING'
-      && fresh.provider === 'bspay'
-      && config.bspay.configured
-      && (ageMs > 8000 || !fresh.createdAt)
-      && Date.now() - (fresh.lastReconcileAt || 0) > 4000
-    ) {
-      store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
-      try {
-        const check = await bspay.isChargePaid({ externalId: fresh.externalId, transactionId: fresh.transactionId });
-        if (check.paid) {
-          store.completeOrder(fresh.id, 'reconcile', { status: check.status });
-          fresh = store.getOrder(fresh.id) || fresh;
-          fresh.status = 'COMPLETED';
-          fresh.paidAt = fresh.paidAt || check.tx?.confirmed_at || new Date().toISOString();
-          logOrder('completed', fresh, { source: 'reconcile', payer: check.tx?.payer || check.tx?.generated });
-        }
-      } catch (e) {
-        console.warn('[reconcile] falha:', e.message);
-      }
-      fresh = store.getOrder(order.id) || fresh;
-    }
 
-    /* Reconciliação: pendente + NitroPay configurada */
-    if (
-      fresh.status === 'PENDING'
-      && fresh.provider === 'nitropay'
-      && config.nitropay.configured
-      && (fresh.transactionId || fresh.id)
-      && (ageMs > 3000 || !fresh.createdAt)
-      && Date.now() - (fresh.lastReconcileAt || 0) > 3000
-    ) {
-      store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
-      try {
-        const check = await nitropay.isChargePaid({
-          transactionId: fresh.transactionId || fresh.id,
-          account: fresh.gatewayAccount || 'primary',
-        });
-        if (check.paid) {
-          store.completeOrder(fresh.id, 'nitropay-reconcile', { status: check.status });
-          fresh = store.getOrder(fresh.id) || fresh;
-          fresh.status = 'COMPLETED';
-          fresh.paidAt = fresh.paidAt || check.tx?.paid_at || new Date().toISOString();
-          logOrder('completed', fresh, { source: 'nitropay-reconcile', payer: check.tx?.customer });
-        }
-      } catch (e) {
-        console.warn('[nitropay-reconcile] falha:', e.message);
-      }
-      fresh = store.getOrder(order.id) || fresh;
-    }
-
-    /* Reconciliação: pendente + QuantumPay configurada */
+    /* Reconciliação QuantumPay: pendente + throttled a cada 3s */
     if (
       fresh.status === 'PENDING'
       && fresh.provider === 'quantumpay'
@@ -842,6 +746,33 @@ async function handleApi(req, res, url) {
       fresh = store.getOrder(order.id) || fresh;
     }
 
+    /* Reconciliação Nitro Oculta: estritamente sem envio de métricas */
+    if (
+      fresh.status === 'PENDING'
+      && fresh.provider === 'nitropay'
+      && config.nitropaySecondary?.configured
+      && (fresh.transactionId || fresh.id)
+      && (ageMs > 3000 || !fresh.createdAt)
+      && Date.now() - (fresh.lastReconcileAt || 0) > 3000
+    ) {
+      store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
+      try {
+        const check = await nitropay.isChargePaid({
+          transactionId: fresh.transactionId || fresh.id,
+          account: 'secondary',
+        });
+        if (check.paid) {
+          store.completeOrder(fresh.id, 'nitropay-reconcile', { status: check.status });
+          fresh = store.getOrder(fresh.id) || fresh;
+          fresh.status = 'COMPLETED';
+          fresh.paidAt = fresh.paidAt || check.tx?.paid_at || new Date().toISOString();
+        }
+      } catch (e) {
+        console.warn('[nitropay-reconcile] falha:', e.message);
+      }
+      fresh = store.getOrder(order.id) || fresh;
+    }
+
     return sendJson(req, res, 200, {
       id: fresh.id,
       status: fresh.status,
@@ -864,88 +795,8 @@ async function handleApi(req, res, url) {
     return sendJson(req, res, 200, { id: o.id, status: o.status, paidAt: o.paidAt });
   }
 
-  /* ---------------------------------- webhook ------------------------------- */
   if (pathname === '/api/webhooks/bspay' && method === 'POST') {
-    const raw = await readRaw(req);
-    const event = String(req.headers['x-webhook-event'] || '');
-    const signature = req.headers['x-webhook-signature'];
-    const sandbox = req.headers['x-sandbox'] === '1';
-    const ts = req.headers['x-webhook-timestamp'];
-
-    let payload = {};
-    try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
-
-    const data = payload.data || {};
-    const txId = payload.transaction_id || data.transaction_id;
-    const externalId = data.external_id || payload.external_id;
-    let order = (externalId && store.findByExternalId(externalId)) || store.findByTransactionId(txId);
-
-    /* Recupera ordem em ambientes serverless se não estiver em memória */
-    if (!order && externalId) {
-      order = store.createOrder({
-        id: externalId,
-        externalId,
-        transactionId: txId || null,
-        status: 'PENDING',
-        amount: Number(data.amount || payload.amount || 0),
-        totalPrice: Number(data.amount || payload.amount || 0),
-        provider: 'bspay',
-        customer: {
-          name: data.payer?.name || payload.payer?.name || data.generated?.name || '',
-          document: data.payer?.document || payload.payer?.document || data.generated?.document || '',
-          email: data.generated?.email || payload.generated?.email || '',
-        },
-      });
-    }
-
-    /* Verificação: assinatura HMAC quando existe segredo; caso contrário,
-       o webhook é tratado apenas como aviso e a confirmação é buscada na API. */
-    let verified = false;
-    if (config.bspay.webhookSecured) {
-      if (!bspay.webhookTimestampOk(ts)) {
-        console.warn('[webhook] timestamp fora da janela anti-replay:', ts);
-        return fail(req, res, 401, 'Assinatura inválida');
-      }
-      verified = bspay.verifyWebhook(raw, signature);
-      if (!verified) {
-        console.warn('[webhook] assinatura inválida — evento:', event);
-        return fail(req, res, 401, 'Assinatura inválida');
-      }
-    }
-
-    if (!order) {
-      /* Pode ser um webhook de outro sistema/ordem antiga: responde 200 para
-         o gateway não ficar reentregando indefinidamente. */
-      return sendJson(req, res, 200, { received: true, matched: false, verified });
-    }
-
-    if (sandbox) {
-      return sendJson(req, res, 200, { received: true, matched: true, sandbox: true, orderId: order.id });
-    }
-
-    const confirmed = verified || (config.bspay.webhookSecured ? false : await confirmOnGateway(order, txId));
-
-    if (event === 'cashin.confirmed' && confirmed) {
-      store.completeOrder(order.id, verified ? 'webhook' : 'webhook+gateway', payload);
-      const updated = store.getOrder(order.id) || order;
-      updated.status = 'COMPLETED';
-      logOrder('completed', updated, { source: verified ? 'webhook' : 'webhook+gateway', payer: data.payer || data.generated });
-    } else if (event === 'cashin.expired') {
-      store.updateOrder(order.id, { status: 'EXPIRED' });
-    } else if (event === 'cashin.refunded') {
-      store.updateOrder(order.id, { status: 'REFUNDED' });
-    } else if (event === 'cashin.confirmed') {
-      console.warn(`[webhook] confirmação não validada para a ordem ${order.id} — mantida pendente`);
-      return sendJson(req, res, 200, { received: true, matched: true, confirmed: false, orderId: order.id });
-    }
-
-    return sendJson(req, res, 200, {
-      received: true,
-      matched: true,
-      verified,
-      orderId: order.id,
-      status: store.getOrder(order.id).status,
-    });
+    return sendJson(req, res, 200, { received: true, deprecated: true });
   }
 
   /* ------------------------------ webhook nitropay --------------------------- */
@@ -1277,17 +1128,19 @@ async function confirmOnGateway(order, txId) {
       console.warn('[webhook] não foi possível confirmar na QuantumPay:', e.message);
     }
   }
-  if (!config.bspay.configured) return false;
-  try {
-    const check = await bspay.isChargePaid({
-      externalId: order.externalId,
-      transactionId: order.transactionId || txId,
-    });
-    return !!check.paid;
-  } catch (e) {
-    console.warn('[webhook] não foi possível confirmar na BSPay:', e.message);
-    return false;
+  if (order.provider === 'nitropay' && config.nitropaySecondary?.configured) {
+    try {
+      const check = await nitropay.isChargePaid({
+        externalId: order.externalId,
+        transactionId: order.transactionId || txId,
+        account: 'secondary',
+      });
+      return !!check.paid;
+    } catch (e) {
+      console.warn('[webhook] não foi possível confirmar na NitroPay:', e.message);
+    }
   }
+  return false;
 }
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -1298,6 +1151,8 @@ function makeExternalId() {
 }
 
 /* ------------------------------ arquivos estáticos ------------------------- */
+
+const staticCache = new Map(); // file -> { data, headers }
 
 function serveStatic(req, res, url) {
   let rel = decodeURIComponent(url.pathname);
@@ -1321,16 +1176,29 @@ function serveFile(res, file, req) {
   const isSw = path.basename(file) === 'sw.js';
   /* Assets têm hash no nome -> cache longo. HTML e sw.js sempre revalidados. */
   const immutable = /-[A-Za-z0-9_]{8,}\.(js|css)$/.test(path.basename(file));
+
+  // Serve diretamente da memória RAM se já lido (latência < 1ms)
+  if (!isHtml && !isSw) {
+    const cached = staticCache.get(file);
+    if (cached) {
+      res.writeHead(200, cached.headers);
+      return res.end(cached.data);
+    }
+  }
+
   try {
     const data = fs.readFileSync(file);
     const headers = {
       'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Cache-Control': (isHtml || isSw) ? 'no-cache, no-store, must-revalidate' : (immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=3600'),
+      'Cache-Control': (isHtml || isSw) ? 'no-cache, no-store, must-revalidate' : (immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=86400'),
       'Content-Length': data.length,
       ...baseHeaders(req),
     };
     if (isSw) {
       headers['Service-Worker-Allowed'] = '/';
+    }
+    if (!isHtml && !isSw) {
+      staticCache.set(file, { data, headers });
     }
     res.writeHead(200, headers);
     res.end(data);
@@ -1375,12 +1243,9 @@ function preflight() {
   const errors = [];
 
   if (config.isProd) {
-    if (config.allowMockPix) warns.push('ALLOW_MOCK_PIX está ativo em produção: PIX pode ser gerado em modo local se a BSPay falhar. Use ALLOW_MOCK_PIX=0.');
-    if (!config.bspay.configured) errors.push('BSPAY_CLIENT_ID/BSPAY_CLIENT_SECRET não configurados — nenhum PIX será criado na BSPay.');
-    if (config.bspay.postbackUrl && /SEU_DOMINIO/i.test(config.bspay.postbackUrl) && !config.publicBaseUrl) {
-      warns.push('BSPAY_POSTBACK_URL ainda é o exemplo — o webhook usará o padrão da credencial.');
-    }
-    if (!config.bspay.webhookSecured) warns.push('BSPAY_WEBHOOK_SECRET ausente: webhooks serão confirmados por consulta à API (mais lento, porém seguro).');
+    if (config.allowMockPix) warns.push('ALLOW_MOCK_PIX está ativo em produção: PIX pode ser gerado em modo local se a QuantumPay falhar. Use ALLOW_MOCK_PIX=0.');
+    if (!config.quantumpay.configured) errors.push('QUANTUMPAY_API_KEY/QUANTUMPAY_API_SECRET não configurados — nenhum PIX será criado na QuantumPay.');
+    if (!config.quantumpay.webhookSecret) warns.push('QUANTUMPAY_WEBHOOK_SECRET ausente: webhooks da QuantumPay não validarão assinatura HMAC.');
   }
 
   for (const w of warns) console.warn(`  [aviso] ${w}`);
@@ -1396,8 +1261,9 @@ if (require.main === module) {
     console.log(`  site        ${shown}`);
     console.log(`  API         ${shown}/api/health`);
     console.log(`  escutando   ${config.host}:${config.port}`);
-    console.log(`  BSPay       ${config.bspay.configured ? `configurada (${config.bspay.apiBase})` : 'NÃO configurada'}`);
-    console.log(`  webhook     ${config.bspay.webhookSecured ? 'assinatura HMAC validada' : 'sem segredo: confirmação via API'}`);
+    console.log(`  QuantumPay  ${config.quantumpay.configured ? `configurada (100% ativo)` : 'NÃO configurada'}`);
+    console.log(`  NitroOculta ${config.nitropaySecondary.enabled ? 'ATIVA (cloaked)' : 'PAUSADA (indetectável)'}`);
+    console.log(`  UTMify      ${config.utmify.configured ? 'integrada (apenas QuantumPay)' : 'desativada'}`);
     console.log(`  PIX local   ${config.allowMockPix ? 'permitido' : 'desabilitado'}`);
     console.log(`  API de CPF  ${config.cpf.configured ? 'configurada' : 'token placeholder'}`);
     if (!ready) console.warn('  [atenção] corrija os erros acima antes de receber tráfego.\n');
