@@ -965,6 +965,13 @@ async function handleApi(req, res, url) {
       if (body.visitorId) {
         store.updateVisitor(body.visitorId, { pushSubscribed: true });
       }
+      if (body.sendWelcome) {
+        pushService.sendNotification(saved, {
+          title: '🔔 Notificações Ativadas com Sucesso!',
+          body: 'Você receberá atualizações sobre a liberação do seu crédito aqui no seu celular.',
+          targetUrl: '/retomar',
+        }).catch(() => {});
+      }
       triggerAutoRecoveryThrottled();
       return sendJson(req, res, 200, { ok: true, id: saved.endpoint });
     } catch (e) {
@@ -1088,20 +1095,45 @@ async function handleApi(req, res, url) {
     }
   }
 
-  if (pathname === '/api/push/test' && method === 'POST') {
-    const body = await readJson(req);
-    const data = body.data || body;
-    const isTestFilter = body.isTest !== undefined ? Boolean(body.isTest) : null;
+  if ((pathname === '/api/push/test' || pathname === '/api/push/send-test-now') && (method === 'GET' || method === 'POST')) {
+    let data = {
+      title: '🔔 Teste Valore: Notificação Recebida!',
+      body: 'Suas notificações push estão ativas e funcionando perfeitamente no seu celular.',
+      targetUrl: '/retomar',
+    };
+    let isTestFilter = null;
+
+    if (method === 'POST') {
+      try {
+        const body = await readJson(req);
+        if (body.title || body.body || body.data) {
+          data = body.data || body;
+        }
+        if (body.isTest !== undefined) isTestFilter = Boolean(body.isTest);
+      } catch {}
+    }
+
     const result = await pushService.broadcast(data, { isTest: isTestFilter });
     if (result.total === 0) {
       const allSubs = pushService.getSubscriptions();
       if (allSubs.length > 0) {
         const last = allSubs[allSubs.length - 1];
         const singleRes = await pushService.sendNotification(last, data);
-        return sendJson(req, res, 200, { ok: singleRes.ok, sent: singleRes.ok ? 1 : 0, total: 1, error: singleRes.error });
+        return sendJson(req, res, 200, {
+          ok: singleRes.ok,
+          sent: singleRes.ok ? 1 : 0,
+          total: 1,
+          error: singleRes.error,
+          message: singleRes.ok ? 'Notificação de teste disparada com sucesso para 1 aparelho!' : 'Falha ao disparar para o aparelho.',
+        });
       }
     }
-    return sendJson(req, res, 200, result);
+    return sendJson(req, res, 200, {
+      ...result,
+      message: result.sent > 0
+        ? `Notificação enviada com sucesso para ${result.sent} aparelho(s)!`
+        : 'Nenhuma notificação enviada. Ative as notificações no navegador primeiro.',
+    });
   }
 
   return fail(req, res, 404, `Rota não encontrada: ${method} ${pathname}`);

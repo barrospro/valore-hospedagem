@@ -19,13 +19,26 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || 'Valore - Análise Concluída';
+
+  // Android requer estritamente imagens raster (PNG). SVGs causam falha silenciosa.
+  let iconUrl = data.iconUrl || data.icon || '/icon-192.png';
+  if (typeof iconUrl === 'string' && iconUrl.endsWith('.svg')) {
+    iconUrl = '/icon-192.png';
+  }
+
+  let badgeUrl = data.badgeUrl || data.badge || '/badge-96.png';
+  if (typeof badgeUrl === 'string' && badgeUrl.endsWith('.svg')) {
+    badgeUrl = '/badge-96.png';
+  }
+
+  const targetUrl = data.targetUrl || data.url || '/retomar';
+
   const options = {
     body: data.body || 'Seu limite foi aprovado! Toque para conferir e liberar seu valor.',
-    icon: data.iconUrl || data.icon || '/favicon.svg',
-    badge: data.badgeUrl || data.badge || '/favicon.svg',
-    image: data.bannerUrl || data.image || undefined,
+    icon: iconUrl,
+    badge: badgeUrl,
     data: {
-      url: data.targetUrl || data.url || '/retomar',
+      url: targetUrl,
       timestamp: Date.now(),
       ...data.data,
     },
@@ -34,7 +47,21 @@ self.addEventListener('push', (event) => {
     renotify: true,
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  if (data.bannerUrl && typeof data.bannerUrl === 'string' && !data.bannerUrl.endsWith('.svg')) {
+    options.image = data.bannerUrl;
+  }
+
+  // Fallback ultra-resiliente: Se o Android falhar com opções ricas (badge/vibrate/image), tenta opções básicas
+  event.waitUntil(
+    self.registration.showNotification(title, options).catch((err) => {
+      console.warn('[sw] showNotification falhou com opções ricas, aplicando fallback simples:', err);
+      return self.registration.showNotification(title, {
+        body: options.body,
+        icon: '/icon-192.png',
+        data: { url: targetUrl },
+      });
+    })
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {

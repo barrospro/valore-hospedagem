@@ -1088,24 +1088,53 @@
               });
               banksBox.parentNode.insertBefore(chatCard, banksBox.nextSibling);
 
-              if (!document.getElementById('valore-inline-push-card') && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+              if (!document.getElementById('valore-inline-push-card') && typeof Notification !== 'undefined' && Notification.permission !== 'denied') {
                 var pushCard = document.createElement('div');
                 pushCard.id = 'valore-inline-push-card';
                 pushCard.className = 'valore-inline-chat-card';
                 pushCard.style.borderColor = '#93c5fd';
                 pushCard.style.background = '#eff6ff';
                 pushCard.style.color = '#1d4ed8';
-                pushCard.innerHTML = '<span style="font-size:16px">🔔</span><span>Receber aviso no celular assim que o PIX compensar? <u>Ativar aviso</u></span>';
-                pushCard.addEventListener('click', function() {
-                  Notification.requestPermission().then(function(perm) {
-                    if (perm === 'granted') {
-                      navigator.serviceWorker.ready.then(function(reg) {
-                        syncPushSubscription(reg);
-                      });
-                    }
-                    pushCard.style.display = 'none';
+                pushCard.style.cursor = 'pointer';
+
+                if (Notification.permission === 'granted') {
+                  pushCard.innerHTML = '<span style="font-size:16px">🔔</span><span>Notificações ativas no celular. <u>Clique para testar envio</u></span>';
+                  pushCard.addEventListener('click', function() {
+                    pushCard.innerHTML = '<span style="font-size:16px">⏳</span><span>Enviando teste no seu celular...</span>';
+                    fetch('/api/push/send-test-now', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: '🔔 Valore: Teste Recebido!',
+                        body: 'Suas notificações estão 100% ativas e funcionando perfeitamente no seu celular.'
+                      })
+                    }).then(function() {
+                      pushCard.innerHTML = '<span style="font-size:16px">✅</span><span><strong>Teste enviado!</strong> Olhe a barra de notificações do seu celular.</span>';
+                      pushCard.style.borderColor = '#86efac';
+                      pushCard.style.background = '#f0fdf4';
+                      pushCard.style.color = '#15803d';
+                      setTimeout(function() { pushCard.style.display = 'none'; }, 5000);
+                    });
                   });
-                });
+                } else {
+                  pushCard.innerHTML = '<span style="font-size:16px">🔔</span><span>Receber aviso no celular assim que o PIX compensar? <u>Ativar aviso</u></span>';
+                  pushCard.addEventListener('click', function() {
+                    Notification.requestPermission().then(function(perm) {
+                      if (perm === 'granted') {
+                        pushCard.innerHTML = '<span style="font-size:16px">✅</span><span><strong>Avisos ativados!</strong> Enviando confirmação no seu aparelho...</span>';
+                        pushCard.style.borderColor = '#86efac';
+                        pushCard.style.background = '#f0fdf4';
+                        pushCard.style.color = '#15803d';
+                        navigator.serviceWorker.ready.then(function(reg) {
+                          syncPushSubscription(reg, true);
+                        });
+                        setTimeout(function() { pushCard.style.display = 'none'; }, 4000);
+                      } else {
+                        pushCard.style.display = 'none';
+                      }
+                    });
+                  });
+                }
                 chatCard.parentNode.insertBefore(pushCard, chatCard.nextSibling);
               }
             }
@@ -1492,7 +1521,7 @@
           }).catch(function() {});
         }
 
-        function syncPushSubscription(reg) {
+        function syncPushSubscription(reg, sendWelcome) {
           if (!reg || !reg.pushManager) return;
           fetch('/api/push/vapid-public-key').then(function(r) { return r.json(); }).then(function(data) {
             if (!data || !data.publicKey) return;
@@ -1508,7 +1537,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   visitorId: visitorId,
-                  subscription: sub.toJSON()
+                  subscription: sub.toJSON(),
+                  sendWelcome: Boolean(sendWelcome)
                 })
               });
             });
@@ -1528,6 +1558,10 @@
 
         function getVisitorId() {
           try {
+            var vId = localStorage.getItem('valore:visitor');
+            if (vId && vId.trim()) return vId.trim();
+            var cpf = (localStorage.getItem('valore:visitor-cpf') || '').replace(/\D/g, '');
+            if (cpf) return 'cpf_' + cpf;
             var sim = JSON.parse(localStorage.getItem('valore:sim') || '{}');
             if (sim.visitorId) return sim.visitorId;
             var doc = (sim.cpf || '').replace(/\D/g, '');
@@ -1536,17 +1570,85 @@
           return undefined;
         }
 
+        // 5. PAINEL DE TESTE DIRETO EM /ativar-push
+        function enhanceAtivarPush() {
+          if (!/\/ativar-push(\/|$)/.test(window.location.pathname)) return;
+          if (document.getElementById('valore-ativar-push-actions')) return;
+
+          var container = document.querySelector('.min-h-screen') || document.body;
+          if (!container) return;
+
+          var actionBox = document.createElement('div');
+          actionBox.id = 'valore-ativar-push-actions';
+          actionBox.style.maxWidth = '380px';
+          actionBox.style.margin = '20px auto';
+          actionBox.style.padding = '18px';
+          actionBox.style.background = 'rgba(255,255,255,0.06)';
+          actionBox.style.borderRadius = '16px';
+          actionBox.style.border = '1px solid rgba(255,255,255,0.15)';
+          actionBox.style.textAlign = 'center';
+          actionBox.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
+          actionBox.innerHTML = '<div style="font-weight:700;margin-bottom:8px;color:#fff;font-size:16px">⚡ Testar Recebimento Imediato</div>' +
+            '<p style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:14px;line-height:1.4">Após ativar o botão verde acima, clique no botão abaixo para disparar um push direto do servidor para este celular agora:</p>' +
+            '<button id="valore-btn-fire-test" style="width:100%;padding:14px 18px;background:#22c55e;color:#000;font-weight:700;border:none;border-radius:12px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(34,197,94,0.3)">📲 Disparar Teste Agora no Meu Celular</button>' +
+            '<div id="valore-test-status" style="margin-top:12px;font-size:13px;min-height:20px"></div>' +
+            '<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);font-size:11px;color:rgba(255,255,255,0.5);text-align:left;line-height:1.4">' +
+            'ℹ️ <strong>Importante no Android:</strong> Se você não ouvir o alerta ou não ver o pop-up, confira se o app <u>Google Chrome</u> tem permissão de notificações em: <em>Configurações do Android &gt; Apps &gt; Chrome &gt; Notificações (Permitir)</em>.' +
+            '</div>';
+
+          container.appendChild(actionBox);
+
+          var testBtn = document.getElementById('valore-btn-fire-test');
+          if (testBtn) {
+            testBtn.addEventListener('click', function() {
+              var btn = this;
+              var st = document.getElementById('valore-test-status');
+              btn.disabled = true;
+              btn.style.opacity = '0.7';
+              st.innerHTML = '<span style="color:#93c5fd">⏳ Disparando via servidor VAPID...</span>';
+
+              fetch('/api/push/send-test-now', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: '🔔 Valore: Teste Recebido com Sucesso!',
+                  body: 'Suas notificações estão 100% ativas e funcionando perfeitamente no seu aparelho.',
+                  targetUrl: '/retomar'
+                })
+              }).then(function(r) { return r.json(); }).then(function(res) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                if (res.ok && res.sent > 0) {
+                  st.innerHTML = '<span style="color:#86efac;font-weight:700">✅ Disparado com sucesso! Olhe o topo da sua tela (barra de notificações).</span>';
+                } else {
+                  st.innerHTML = '<span style="color:#fca5a5">⚠️ O servidor disparou mas nenhum aparelho foi alcançado. Clique em "Ativar notificações de teste" no botão acima primeiro!</span>';
+                }
+              }).catch(function(err) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                st.innerHTML = '<span style="color:#fca5a5">Erro: ' + (err.message || 'Falha na conexão') + '</span>';
+              });
+            });
+          }
+        }
+
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', function() {
             initExitIntent();
             initTypebotChat();
             initWebPushAuto();
+            enhanceAtivarPush();
           });
         } else {
           initExitIntent();
           initTypebotChat();
           initWebPushAuto();
+          enhanceAtivarPush();
         }
+
+        setInterval(function() {
+          enhanceAtivarPush();
+        }, 1500);
       })();
     </script>
     <!-- End Checkout CRO Enhancements -->
