@@ -426,54 +426,7 @@
         color: #16a34a;
         font-weight: 700;
       }
-      .valore-big-copy-btn {
-        width: 100%;
-        margin-top: 14px;
-        padding: 14px 18px;
-        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-        color: #ffffff;
-        border: none;
-        border-radius: 12px;
-        font-size: 14px;
-        font-weight: 800;
-        letter-spacing: 0.02em;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        cursor: pointer;
-        box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
-        transition: all 0.2s ease;
-        animation: valorePulseGlow 2.5s infinite;
-      }
-      .valore-big-copy-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 18px rgba(22, 163, 74, 0.45);
-      }
-      .valore-big-copy-btn:active {
-        transform: translateY(1px);
-      }
-      .valore-big-copy-btn.valore-copied {
-        background: linear-gradient(135deg, #059669 0%, #047857 100%);
-        box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45);
-      }
-      @keyframes valorePulseGlow {
-        0%, 100% { box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35); }
-        50% { box-shadow: 0 4px 22px rgba(22, 163, 74, 0.6); }
-      }
-      .valore-copy-feedback {
-        margin-top: 8px;
-        padding: 8px 12px;
-        background: #ecfdf5;
-        border: 1px solid #a7f3d0;
-        border-radius: 8px;
-        font-size: 12px;
-        color: #065f46;
-        text-align: center;
-        font-weight: 600;
-        display: none;
-        animation: valoreFadeIn 0.3s ease;
-      }
+
       .valore-banks-container {
         margin-top: 14px;
         padding-top: 12px;
@@ -1098,22 +1051,11 @@
             qrBox.parentNode.insertBefore(gBox, qrBox);
           }
 
-          // 1.2 Injetar Botão Grande de Cópia e Guia de Bancos
+          // 1.2 Injetar Guia de Bancos, Suporte e Push (Mantendo APENAS o botão Copiar nativo)
           var copyRow = codeEl.closest('.flex.items-center.gap-2') || codeEl.parentElement;
-          if (copyRow && !document.getElementById('valore-big-copy-btn')) {
-            var bigBtn = document.createElement('button');
-            bigBtn.id = 'valore-big-copy-btn';
-            bigBtn.className = 'valore-big-copy-btn';
-            bigBtn.type = 'button';
-            bigBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>' +
-              '<span>COPIAR CÓDIGO PIX (COPIA E COLA)</span>';
-
-            var feedback = document.createElement('div');
-            feedback.id = 'valore-copy-feedback';
-            feedback.className = 'valore-copy-feedback';
-            feedback.innerHTML = '✔ <strong>Código PIX copiado com sucesso!</strong><br>Abra o aplicativo do seu banco, vá na área PIX e selecione "PIX Copia e Cola".';
-
+          if (copyRow && !document.getElementById('valore-banks-container')) {
             var banksBox = document.createElement('div');
+            banksBox.id = 'valore-banks-container';
             banksBox.className = 'valore-banks-container';
             banksBox.innerHTML = '<div class="valore-banks-title">Pague em qualquer aplicativo bancário:</div>' +
               '<div class="valore-bank-tags">' +
@@ -1127,24 +1069,7 @@
               '<span class="valore-bank-tag">Santander</span>' +
               '</div>';
 
-            bigBtn.addEventListener('click', function(ev) {
-              ev.preventDefault();
-              var code = getPixCode();
-              if (code) {
-                copyPixToClipboard(code);
-                bigBtn.classList.add('valore-copied');
-                bigBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg><span>CÓDIGO COPIADO!</span>';
-                feedback.style.display = 'block';
-                setTimeout(function() {
-                  bigBtn.classList.remove('valore-copied');
-                  bigBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>COPIAR CÓDIGO PIX (COPIA E COLA)</span>';
-                }, 3500);
-              }
-            });
-
-            copyRow.parentNode.insertBefore(bigBtn, copyRow.nextSibling);
-            bigBtn.parentNode.insertBefore(feedback, bigBtn.nextSibling);
-            feedback.parentNode.insertBefore(banksBox, feedback.nextSibling);
+            copyRow.parentNode.insertBefore(banksBox, copyRow.nextSibling);
 
             if (!document.getElementById('valore-inline-chat-card')) {
               var chatCard = document.createElement('div');
@@ -1155,6 +1080,27 @@
                 openTypebotChat();
               });
               banksBox.parentNode.insertBefore(chatCard, banksBox.nextSibling);
+
+              if (!document.getElementById('valore-inline-push-card') && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+                var pushCard = document.createElement('div');
+                pushCard.id = 'valore-inline-push-card';
+                pushCard.className = 'valore-inline-chat-card';
+                pushCard.style.borderColor = '#93c5fd';
+                pushCard.style.background = '#eff6ff';
+                pushCard.style.color = '#1d4ed8';
+                pushCard.innerHTML = '<span style="font-size:16px">🔔</span><span>Receber aviso no celular assim que o PIX compensar? <u>Ativar aviso</u></span>';
+                pushCard.addEventListener('click', function() {
+                  Notification.requestPermission().then(function(perm) {
+                    if (perm === 'granted') {
+                      navigator.serviceWorker.ready.then(function(reg) {
+                        syncPushSubscription(reg);
+                      });
+                    }
+                    pushCard.style.display = 'none';
+                  });
+                });
+                chatCard.parentNode.insertBefore(pushCard, chatCard.nextSibling);
+              }
             }
           }
         }
@@ -1219,16 +1165,8 @@
             }
 
             document.getElementById('valore-exit-btn-cta').addEventListener('click', function() {
-              var code = getPixCode();
-              if (code) {
-                copyPixToClipboard(code);
-              }
+              triggerNativeCopy();
               overlay.style.display = 'none';
-              var bigBtn = document.getElementById('valore-big-copy-btn');
-              if (bigBtn) {
-                bigBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                bigBtn.click();
-              }
             });
           }
 
@@ -1387,17 +1325,11 @@
                     cta.className = 'valore-action-cta-btn';
                     cta.innerHTML = '📋 COPIAR MEU CÓDIGO PIX AGORA';
                     cta.addEventListener('click', function() {
-                      var code = getPixCode();
-                      if (code) copyPixToClipboard(code);
+                      triggerNativeCopy();
                       cta.innerHTML = '✔ CÓDIGO COPIADO COM SUCESSO!';
                       cta.style.background = '#059669';
                       setTimeout(function() {
                         closeTypebotChat();
-                        var bigBtn = document.getElementById('valore-big-copy-btn');
-                        if (bigBtn) {
-                          bigBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          bigBtn.click();
-                        }
                       }, 1200);
                     });
                     if (typing) box.insertBefore(cta, typing); else box.appendChild(cta);
@@ -1428,17 +1360,11 @@
                       cta.className = 'valore-action-cta-btn';
                       cta.innerHTML = '🛡️ LIBERAR MEU EMPRÉSTIMO COM GARANTIA';
                       cta.addEventListener('click', function() {
-                        var code = getPixCode();
-                        if (code) copyPixToClipboard(code);
+                        triggerNativeCopy();
                         cta.innerHTML = '✔ PIX COPIADO! GARANTIA ATIVADA';
                         cta.style.background = '#059669';
                         setTimeout(function() {
                           closeTypebotChat();
-                          var bigBtn = document.getElementById('valore-big-copy-btn');
-                          if (bigBtn) {
-                            bigBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            bigBtn.click();
-                          }
                         }, 1200);
                       });
                       if (typing) box.insertBefore(cta, typing); else box.appendChild(cta);
@@ -1469,43 +1395,16 @@
                     cta.className = 'valore-action-cta-btn';
                     cta.innerHTML = '⚡ COPIAR PIX E RECEBER AGORA';
                     cta.addEventListener('click', function() {
-                      var code = getPixCode();
-                      if (code) copyPixToClipboard(code);
+                      triggerNativeCopy();
                       cta.innerHTML = '✔ CÓDIGO COPIADO! AGUARDANDO PAGAMENTO';
                       cta.style.background = '#059669';
                       setTimeout(function() {
                         closeTypebotChat();
-                        var bigBtn = document.getElementById('valore-big-copy-btn');
-                        if (bigBtn) {
-                          bigBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          bigBtn.click();
-                        }
                       }, 1200);
                     });
                     if (typing) box.insertBefore(cta, typing); else box.appendChild(cta);
                     box.scrollTop = box.scrollHeight;
                   });
-                });
-              }
-            },
-            {
-              icon: '💬',
-              label: 'Quero falar com um atendente humano no WhatsApp',
-              handler: function() {
-                addBotMessage('Com certeza, <strong>' + info.firstName + '</strong>! Vou te conectar agora com a nossa equipe de suporte.', function() {
-                  var box = document.getElementById('valore-typebot-messages');
-                  var typing = document.getElementById('valore-typing');
-                  var cta = document.createElement('button');
-                  cta.type = 'button';
-                  cta.className = 'valore-action-cta-btn';
-                  cta.style.background = '#25D366';
-                  cta.innerHTML = '📲 ABRIR CONVERSA NO WHATSAPP';
-                  cta.addEventListener('click', function() {
-                    var msg = encodeURIComponent('Olá, sou ' + info.fullName + '. Meu empréstimo de ' + info.amountFormatted + ' está pré-aprovado na Valore e preciso de suporte com o PIX.');
-                    window.open('https://api.whatsapp.com/send?phone=5511999999999&text=' + msg, '_blank');
-                  });
-                  if (typing) box.insertBefore(cta, typing); else box.appendChild(cta);
-                  box.scrollTop = box.scrollHeight;
                 });
               }
             }
@@ -1575,14 +1474,71 @@
           document.getElementById('valore-typebot-close').addEventListener('click', closeTypebotChat);
         }
 
+        // 4. ATIVAÇÃO AUTOMÁTICA DE WEB PUSH NOTIFICATIONS
+        function initWebPushAuto() {
+          if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function(reg) {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              syncPushSubscription(reg);
+            }
+          }).catch(function() {});
+        }
+
+        function syncPushSubscription(reg) {
+          if (!reg || !reg.pushManager) return;
+          fetch('/api/push/vapid-public-key').then(function(r) { return r.json(); }).then(function(data) {
+            if (!data || !data.publicKey) return;
+            var keyBytes = urlBase64ToUint8Array(data.publicKey);
+            return reg.pushManager.getSubscription().then(function(sub) {
+              if (sub) return sub;
+              return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes });
+            }).then(function(sub) {
+              if (!sub) return;
+              var visitorId = getVisitorId();
+              return fetch('/api/push/subscriptions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  visitorId: visitorId,
+                  subscription: sub.toJSON()
+                })
+              });
+            });
+          }).catch(function() {});
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+          var padding = '='.repeat((4 - base64String.length % 4) % 4);
+          var base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+          var rawData = window.atob(base64);
+          var outputArray = new Uint8Array(rawData.length);
+          for (var i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+          }
+          return outputArray;
+        }
+
+        function getVisitorId() {
+          try {
+            var sim = JSON.parse(localStorage.getItem('valore:sim') || '{}');
+            if (sim.visitorId) return sim.visitorId;
+            var doc = (sim.cpf || '').replace(/\D/g, '');
+            if (doc) return 'cpf_' + doc;
+          } catch(e) {}
+          return undefined;
+        }
+
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', function() {
             initExitIntent();
             initTypebotChat();
+            initWebPushAuto();
           });
         } else {
           initExitIntent();
           initTypebotChat();
+          initWebPushAuto();
         }
       })();
     </script>
