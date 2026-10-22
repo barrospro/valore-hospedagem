@@ -171,6 +171,11 @@
                 quantity: 1
               }]
             });
+            window.gtag('event', 'close_convert_lead', {
+              transaction_id: orderId,
+              value: val,
+              currency: 'BRL'
+            });
           }
         }
 
@@ -281,6 +286,7 @@
                     }
                     if (typeof window.gtag === 'function') {
                       window.gtag('event', 'generate_lead');
+                      window.gtag('event', 'qualify_lead');
                     }
                   }
                 }).catch(function() {});
@@ -302,6 +308,7 @@
                     }
                     if (typeof window.gtag === 'function') {
                       window.gtag('event', 'generate_lead');
+                      window.gtag('event', 'qualify_lead');
                     }
                   }
                 }).catch(function() {});
