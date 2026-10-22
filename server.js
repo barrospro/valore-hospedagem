@@ -430,13 +430,6 @@ async function handleApi(req, res, url) {
         phone: null,
         motherName: null,
         gender: '',
-        _debug: {
-          error: e.message,
-          code: e.code,
-          upstream: e.upstream,
-          base: config.cpf.base,
-          tokenPrefix: config.cpf.token ? config.cpf.token.slice(0, 4) : '',
-        },
       });
     }
   }
