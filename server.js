@@ -1000,8 +1000,13 @@ async function handleApi(req, res, url) {
     let payload = {};
     try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
 
-    const signature = req.headers['x-signature'] || '';
+    const signature = req.headers['quantum-pay-signature'] || req.headers['x-signature'] || '';
     const verified = quantumpay.verifyWebhook(raw.toString('utf8'), signature);
+
+    if (signature && !verified) {
+      console.warn('[quantumpay-webhook] Assinatura Quantum-Pay-Signature inválida:', signature);
+      return fail(req, res, 401, 'Assinatura inválida');
+    }
 
     const event = String(payload.event || '').toLowerCase();
     const data = payload.data || payload;
