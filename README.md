@@ -86,9 +86,9 @@ Extras operacionais (não usados pelo site): `GET /api/health`, `GET /api/admin/
 `GET /api/cep/:cep`, `POST /api/orders/:id/simulate-paid` (só com `ALLOW_MOCK_PIX=1`).
 
 O catálogo de produtos é o mesmo do site, com todos os 9 produtos e 3 order bumps
-(`seguro-basico` 17.70, `seguro-plus` 36, `seguro-premium` 52, `iof` 26,
-`tarifa-cadastro` 21, `taxa-app` 24, `aumento-limite` 25, `tarifa-prioridade` 18,
-`taxa-protecao` 72, `bump-suporte` 16, `bump-credito` 29, `bump-cartao` 26).
+(`seguro-basico` 17.70, `seguro-plus` 25.20, `seguro-premium` 36.40, `iof` 18.20,
+`tarifa-cadastro` 14.70, `taxa-app` 16.80, `aumento-limite` 17.50, `tarifa-prioridade` 12.60,
+`taxa-protecao` 50.40, `bump-suporte` 11.20, `bump-credito` 20.30, `bump-cartao` 18.20).
 Só o nome do bump de cartão cita a marca: **Cartão de Crédito Valore**.
 
 ## PIX
