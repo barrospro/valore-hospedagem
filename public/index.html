@@ -1032,6 +1032,18 @@
           };
         }
 
+        
+        function triggerNativeCopy() {
+          var code = getPixCode();
+          if (code) copyPixToClipboard(code);
+          var codeEl = document.querySelector('p.font-mono');
+          var copyRow = codeEl ? (codeEl.closest('.flex.items-center.gap-2') || codeEl.parentElement) : null;
+          var nativeBtn = copyRow ? copyRow.querySelector('button') : null;
+          if (nativeBtn) {
+            nativeBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            nativeBtn.click();
+          }
+        }
         function copyPixToClipboard(text) {
           if (!text) return;
           try {

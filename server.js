@@ -42,6 +42,24 @@ const pushService = require('./lib/push');
 const recovery = require('./lib/recovery');
 const pushAdmin = require('./lib/push-admin');
 
+let isRunningAutoRecovery = false;
+let lastAutoRecoveryRun = 0;
+function triggerAutoRecoveryThrottled() {
+  const now = Date.now();
+  if (isRunningAutoRecovery || (now - lastAutoRecoveryRun < 15000)) return;
+  lastAutoRecoveryRun = now;
+  isRunningAutoRecovery = true;
+  Promise.resolve().then(async () => {
+    try {
+      await recovery.processAutomatedRecovery();
+    } catch (e) {
+      console.warn('[recovery-auto] Falha ao processar recuperação:', e.message);
+    } finally {
+      isRunningAutoRecovery = false;
+    }
+  });
+}
+
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ORDER_LOG = path.join(config.dataDir, 'orders.jsonl');
 
@@ -466,7 +484,9 @@ async function handleApi(req, res, url) {
     if (method === 'PATCH' || method === 'PUT') {
       const body = await readJson(req);
       if (!store.getVisitor(id)) return fail(req, res, 404, 'Visitante não encontrado');
-      return sendJson(req, res, 200, store.updateVisitor(id, body));
+      const updated = store.updateVisitor(id, body);
+      triggerAutoRecoveryThrottled();
+      return sendJson(req, res, 200, updated);
     }
   }
 
@@ -625,6 +645,7 @@ async function handleApi(req, res, url) {
       postbackUrl: charge.postbackUrl || null,
     });
     logOrder('charged', store.getOrder(order.id));
+    triggerAutoRecoveryThrottled();
     return sendJson(req, res, 200, { configured: true, order: publicOrder(store.getOrder(order.id)) });
   }
 
@@ -944,6 +965,7 @@ async function handleApi(req, res, url) {
       if (body.visitorId) {
         store.updateVisitor(body.visitorId, { pushSubscribed: true });
       }
+      triggerAutoRecoveryThrottled();
       return sendJson(req, res, 200, { ok: true, id: saved.endpoint });
     } catch (e) {
       return fail(req, res, 400, e.message);
@@ -1212,14 +1234,14 @@ if (require.main === module) {
     console.log(`  API de CPF  ${config.cpf.configured ? 'configurada' : 'token placeholder'}`);
     if (!ready) console.warn('  [atenção] corrija os erros acima antes de receber tráfego.\n');
 
-    // Automação periódica de recuperação de vendas e conversão (a cada 5 minutos)
+    // Automação periódica de recuperação de vendas e conversão (a cada 2 minutos)
     setInterval(async () => {
       try {
         await recovery.processAutomatedRecovery();
       } catch (err) {
         console.warn('[recovery-cron] Falha ao processar recuperação:', err.message);
       }
-    }, 5 * 60 * 1000).unref();
+    }, 2 * 60 * 1000).unref();
   });
 
   const shutdown = (sig) => {
