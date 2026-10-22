@@ -420,7 +420,17 @@ async function handleApi(req, res, url) {
         gender: genderMap[person.genero] || '',
       });
     } catch (e) {
-      return fail(req, res, e.status || 502, e.message);
+      if (e.code === 'INVALID_CPF') {
+        return fail(req, res, 422, e.message);
+      }
+      return sendJson(req, res, 200, {
+        configured: false,
+        name: null,
+        birthDate: null,
+        phone: null,
+        motherName: null,
+        gender: '',
+      });
     }
   }
 
