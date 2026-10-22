@@ -211,6 +211,11 @@ function logOrder(event, order, extra = {}) {
       metaCapi.sendPurchase(order, combinedUser, { userData: extra?.payer || {} }).catch((e) => {
         console.warn('[meta-capi] falha ao enviar purchase:', e.message);
       });
+      if (order.provider === 'quantumpay') {
+        utmify.notifyPixPaid(order, visitor).catch((e) => {
+          console.warn('[utmify] falha ao notificar compra aprovada:', e.message);
+        });
+      }
     } catch (e) {
       console.warn('[meta-capi] erro:', e.message);
     }
@@ -469,7 +474,7 @@ async function handleApi(req, res, url) {
   /* -------------------------------- visitantes ------------------------------ */
   if (pathname === '/api/visitors' && method === 'POST') {
     const body = await readJson(req);
-    const utm = Object.fromEntries([...searchParams].filter(([k]) => k.startsWith('utm_')));
+    const utm = Object.fromEntries([...searchParams].filter(([k]) => k.startsWith('utm_') || k === 'src' || k === 'sck'));
     return sendJson(req, res, 200, store.createVisitor(body, {
       ip,
       userAgent: req.headers['user-agent'] || '',
