@@ -406,6 +406,16 @@ async function handleApi(req, res, url) {
       return fail(req, res, 429, 'Muitas consultas. Aguarde um instante.');
     }
     const body = await readJson(req);
+    if (!config.cpf.configured) {
+      return sendJson(req, res, 200, {
+        configured: false,
+        name: null,
+        birthDate: null,
+        phone: null,
+        motherName: null,
+        gender: '',
+      });
+    }
     try {
       const person = await cpf.lookup(body.cpf);
       const genderMap = { M: 'masculino', F: 'feminino' };
