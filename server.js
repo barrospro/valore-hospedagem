@@ -17,7 +17,7 @@
  *   POST   /api/orders       { visitorId, productId, bumpIds, pushNotificationId }
  *                                         -> { configured, order: { id, status, amount, totalPrice, qrCodeText, qrCodeBase64 } }
  *   GET    /api/orders/:id                -> { id, status, paidAt }   status: PENDING | COMPLETED
- *   POST   /api/webhooks/bspay            webhook cashin.confirmed / cashin.expired / cashin.refunded
+ *   POST   /api/webhooks/quantumpay       webhook de confirmação de pagamento PIX
  *   GET    /api/health[?deep=1]           operacional
  *   GET    /api/admin/stats               operacional (protegido por ADMIN_TOKEN em produção)
  *   POST   /api/orders/:id/simulate-paid  SOMENTE fora de produção e com ALLOW_MOCK_PIX=1
@@ -795,9 +795,6 @@ async function handleApi(req, res, url) {
     return sendJson(req, res, 200, { id: o.id, status: o.status, paidAt: o.paidAt });
   }
 
-  if (pathname === '/api/webhooks/bspay' && method === 'POST') {
-    return sendJson(req, res, 200, { received: true, deprecated: true });
-  }
 
   /* ------------------------------ webhook nitropay --------------------------- */
   if (pathname === '/api/webhooks/nitropay' && method === 'POST') {

@@ -2,25 +2,20 @@
   "name": "valore",
   "version": "1.0.0",
   "private": true,
-  "description": "Site de captação de crédito com checkout PIX integrado à BSPay, consulta de CPF e ViaCEP",
+  "description": "Site de captação de crédito com checkout PIX integrado, consulta de CPF e ViaCEP",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "build:mirror": "node tools/build-mirror.cjs",
     "check:mirror": "node tools/build-mirror.cjs --check",
-    "mock:bspay": "node tests/mock-bspay.js 3099",
-    "test:prod": "node tests/prod-flow.test.cjs",
-    "bspay:check": "node tools/bspay-check.cjs",
-    "bspay:balance": "node tools/bspay-check.cjs --balance",
     "utmify:sync": "node tools/sync-past-sales-utmify.cjs",
-    "check": "node --check server.js && node --check api/index.js && node --check lib/bspay.js && node --check lib/quantumpay.js && node --check lib/nitropay.js && node --check lib/cpf.js && node --check lib/cep.js && node --check lib/pix.js && node --check lib/qrimg.js && node --check lib/store.js && node --check lib/products.js && node --check lib/push.js && node --check lib/recovery.js && node --check lib/push-admin.js && node --check lib/utmify.js"
+    "check": "node --check server.js && node --check api/index.js && node --check lib/quantumpay.js && node --check lib/nitropay.js && node --check lib/cpf.js && node --check lib/cep.js && node --check lib/pix.js && node --check lib/qrimg.js && node --check lib/store.js && node --check lib/products.js && node --check lib/push.js && node --check lib/recovery.js && node --check lib/push-admin.js && node --check lib/utmify.js"
   },
   "engines": {
     "node": ">=18"
   },
   "keywords": [
     "pix",
-    "bspay",
     "credito",
     "correspondente-bancario",
     "viacep"

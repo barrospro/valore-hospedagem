@@ -19,3 +19,6 @@ tests/mock-bspay.log.json
 .DS_Store
 Thumbs.db
 .vercel
+scratch/
+*.bak*
+docs/extract_*.txt
