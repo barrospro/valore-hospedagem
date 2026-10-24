@@ -424,32 +424,40 @@ Error generating stack: `+m.message+`
           i.jsx("span",{className:"text-xs font-semibold text-[#b4f045]",children:"Atualizado agora"})
         ]}),
         i.jsxs("div",{className:"space-y-2.5",children:[
-          i.jsxs("button",{type:"button",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};setSelectedReceipt("loan")},className:"w-full text-left flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] hover:border-[#b4f045]/40 rounded-2xl p-4 transition-all hover:bg-white/[0.06] active:scale-[0.99] cursor-pointer group",children:[
+          i.jsxs("button",{type:"button",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};setSelectedReceipt("loan")},className:"w-full text-left flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] hover:border-[#b4f045]/30 rounded-2xl p-4 transition-all hover:bg-white/[0.06] active:scale-[0.99] cursor-pointer group",children:[
             i.jsx("div",{className:"w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105",style:{backgroundColor:"rgba(180, 240, 69, 0.15)",color:"#b4f045"},children:i.jsx(see,{size:18})}),
             i.jsxs("div",{className:"flex-1 min-w-0",children:[
-              i.jsxs("div",{className:"flex items-center gap-1.5",children:[
-                i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Empréstimo " + Po()}),
-                i.jsx("span",{className:"text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#b4f045]/20 text-[#b4f045] shrink-0",children:"Ver recibo"})
-              ]}),
-              i.jsx("p",{className:"text-xs text-white/40 mt-0.5",children:"Crédito em conta aprovado"})
+              i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Empréstimo " + Po()}),
+              i.jsx("p",{className:"text-xs text-white/40 mt-1 truncate",children:"Crédito em conta aprovado"})
             ]}),
             i.jsxs("div",{className:"text-right shrink-0",children:[
-              i.jsxs("p",{className:"font-black text-sm font-mono",style:{color:"#b4f045"},children:["+",Ce(o)]}),
-              i.jsx("span",{className:"text-[10px] font-semibold text-white/40",children:"Hoje"})
+              i.jsxs("p",{className:"font-black text-sm font-mono tracking-tight",style:{color:"#b4f045"},children:["+",Ce(o)]}),
+              i.jsxs("div",{className:"flex items-center justify-end gap-1 mt-1 text-[11px] text-white/40",children:[
+                i.jsx("span",{className:"font-medium",children:"Hoje"}),
+                i.jsx("span",{className:"text-white/20",children:"•"}),
+                i.jsxs("span",{className:"inline-flex items-center gap-0.5 text-white/45 group-hover:text-[#b4f045] transition-colors font-medium",children:[
+                  "Ver recibo",
+                  i.jsx(fr,{size:11,className:"opacity-60 transition-transform group-hover:translate-x-0.5"})
+                ]})
+              ]})
             ]})
           ]}),
           i.jsxs("button",{type:"button",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};setSelectedReceipt("account")},className:"w-full text-left flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] hover:border-white/20 rounded-2xl p-4 transition-all hover:bg-white/[0.06] active:scale-[0.99] cursor-pointer group",children:[
             i.jsx("div",{className:"w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 text-white/60 transition-transform group-hover:scale-105",children:i.jsx(an,{size:18})}),
             i.jsxs("div",{className:"flex-1 min-w-0",children:[
-              i.jsxs("div",{className:"flex items-center gap-1.5",children:[
-                i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Abertura de Conta Digital"}),
-                i.jsx("span",{className:"text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/10 text-white/60 shrink-0",children:"Ver recibo"})
-              ]}),
-              i.jsx("p",{className:"text-xs text-white/40 mt-0.5",children:"Tarifa zero e isenção vitalícia"})
+              i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Abertura de Conta Digital"}),
+              i.jsx("p",{className:"text-xs text-white/40 mt-1 truncate",children:"Tarifa zero e isenção vitalícia"})
             ]}),
             i.jsxs("div",{className:"text-right shrink-0",children:[
-              i.jsx("p",{className:"font-black text-sm text-white/70 font-mono",children:"R$ 0,00"}),
-              i.jsx("span",{className:"text-[10px] font-semibold text-white/40",children:"Hoje"})
+              i.jsx("p",{className:"font-black text-sm text-white/70 font-mono tracking-tight",children:"R$ 0,00"}),
+              i.jsxs("div",{className:"flex items-center justify-end gap-1 mt-1 text-[11px] text-white/40",children:[
+                i.jsx("span",{className:"font-medium",children:"Hoje"}),
+                i.jsx("span",{className:"text-white/20",children:"•"}),
+                i.jsxs("span",{className:"inline-flex items-center gap-0.5 text-white/45 group-hover:text-white/80 transition-colors font-medium",children:[
+                  "Ver recibo",
+                  i.jsx(fr,{size:11,className:"opacity-60 transition-transform group-hover:translate-x-0.5"})
+                ]})
+              ]})
             ]})
           ]})
         ]})
