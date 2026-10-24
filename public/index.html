@@ -22,7 +22,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <script type="module" crossorigin src="/assets/index-v2.js?v=20261024_1535"></script>
+    <script type="module" crossorigin src="/assets/index-v3.js?v=3.0.0"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DUL9RZWL.css">
     <!-- Vercel Web Analytics -->
     <script>
@@ -1817,6 +1817,10 @@
         }
 
         function openExtratoModal() {
+          if (typeof window.openReceiptModal === 'function') {
+            window.openReceiptModal('loan');
+            return;
+          }
           closeFintechModal();
           var info = getCustomerInfo();
           var backdrop = document.createElement('div');

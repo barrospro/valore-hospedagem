@@ -198,6 +198,7 @@ Error generating stack: `+m.message+`
   const [bank,setBank]=S.useState(e.bank||"");
   const [hasSubmitted,setHasSubmitted]=S.useState(!1);
   const [isCardModalOpen,setIsCardModalOpen]=S.useState(!1);
+  const [selectedReceipt,setSelectedReceipt]=S.useState(null);
   const [cardLimitBase,setCardLimitBase]=S.useState(5000);
   const [cardAgreed,setCardAgreed]=S.useState(!0);
   const [isEditingAddress,setIsEditingAddress]=S.useState(!1);
@@ -216,11 +217,11 @@ Error generating stack: `+m.message+`
   const keyInputRef=S.useRef(null);
 
   S.useEffect(()=>{
-    if(!isModalOpen&&!isCardModalOpen)return;
+    if(!isModalOpen&&!isCardModalOpen&&!selectedReceipt)return;
     const prev=document.body.style.overflow;
     document.body.style.overflow="hidden";
     return()=>{document.body.style.overflow=prev};
-  },[isModalOpen,isCardModalOpen]);
+  },[isModalOpen,isCardModalOpen,selectedReceipt]);
 
   S.useEffect(()=>{
     const h=document.documentElement;
@@ -235,6 +236,13 @@ Error generating stack: `+m.message+`
   },[]);
 
   S.useEffect(()=>()=>{timerRef.current&&clearTimeout(timerRef.current)},[]);
+  S.useEffect(()=>{
+    window.openReceiptModal=(type)=>{
+      if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};
+      setSelectedReceipt(type||"loan");
+    };
+    return()=>{delete window.openReceiptModal};
+  },[]);
 
   const curKeyConfig=pixKeyType?QR.find(k=>k.id===pixKeyType)??null:null;
   const isKeyFilled=pixKey.trim().length>0;
@@ -416,24 +424,30 @@ Error generating stack: `+m.message+`
           i.jsx("span",{className:"text-xs font-semibold text-[#b4f045]",children:"Atualizado agora"})
         ]}),
         i.jsxs("div",{className:"space-y-2.5",children:[
-          i.jsxs("div",{className:"flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 transition-colors hover:bg-white/[0.06]",children:[
-            i.jsx("div",{className:"w-10 h-10 rounded-2xl flex items-center justify-center shrink-0",style:{backgroundColor:"rgba(180, 240, 69, 0.15)",color:"#b4f045"},children:i.jsx(see,{size:18})}),
+          i.jsxs("button",{type:"button",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};setSelectedReceipt("loan")},className:"w-full text-left flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] hover:border-[#b4f045]/40 rounded-2xl p-4 transition-all hover:bg-white/[0.06] active:scale-[0.99] cursor-pointer group",children:[
+            i.jsx("div",{className:"w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105",style:{backgroundColor:"rgba(180, 240, 69, 0.15)",color:"#b4f045"},children:i.jsx(see,{size:18})}),
             i.jsxs("div",{className:"flex-1 min-w-0",children:[
-              i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Empréstimo " + Po()}),
+              i.jsxs("div",{className:"flex items-center gap-1.5",children:[
+                i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Empréstimo " + Po()}),
+                i.jsx("span",{className:"text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#b4f045]/20 text-[#b4f045] shrink-0",children:"Ver recibo"})
+              ]}),
               i.jsx("p",{className:"text-xs text-white/40 mt-0.5",children:"Crédito em conta aprovado"})
             ]}),
-            i.jsxs("div",{className:"text-right",children:[
+            i.jsxs("div",{className:"text-right shrink-0",children:[
               i.jsxs("p",{className:"font-black text-sm font-mono",style:{color:"#b4f045"},children:["+",Ce(o)]}),
               i.jsx("span",{className:"text-[10px] font-semibold text-white/40",children:"Hoje"})
             ]})
           ]}),
-          i.jsxs("div",{className:"flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 transition-colors hover:bg-white/[0.06]",children:[
-            i.jsx("div",{className:"w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 text-white/60",children:i.jsx(an,{size:18})}),
+          i.jsxs("button",{type:"button",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};setSelectedReceipt("account")},className:"w-full text-left flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] hover:border-white/20 rounded-2xl p-4 transition-all hover:bg-white/[0.06] active:scale-[0.99] cursor-pointer group",children:[
+            i.jsx("div",{className:"w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 text-white/60 transition-transform group-hover:scale-105",children:i.jsx(an,{size:18})}),
             i.jsxs("div",{className:"flex-1 min-w-0",children:[
-              i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Abertura de Conta Digital"}),
+              i.jsxs("div",{className:"flex items-center gap-1.5",children:[
+                i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Abertura de Conta Digital"}),
+                i.jsx("span",{className:"text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/10 text-white/60 shrink-0",children:"Ver recibo"})
+              ]}),
               i.jsx("p",{className:"text-xs text-white/40 mt-0.5",children:"Tarifa zero e isenção vitalícia"})
             ]}),
-            i.jsxs("div",{className:"text-right",children:[
+            i.jsxs("div",{className:"text-right shrink-0",children:[
               i.jsx("p",{className:"font-black text-sm text-white/70 font-mono",children:"R$ 0,00"}),
               i.jsx("span",{className:"text-[10px] font-semibold text-white/40",children:"Hoje"})
             ]})
@@ -598,6 +612,106 @@ Error generating stack: `+m.message+`
       i.jsxs("button",{type:"button",disabled:!cardAgreed,onClick:handleConfirmCard,className:"w-full h-14 rounded-2xl font-black text-base transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed",style:{backgroundColor:"#b4f045",color:"#0f1712",boxShadow:"0 8px 25px rgba(180,240,69,0.3)"},children:[
         "Solicitar Cartão ("+Ce(cardTotalLimit)+") — R$ 19,90",
         i.jsx(xm,{size:18})
+      ]})
+    ]})}),
+    selectedReceipt&&i.jsx(we.div,{className:"fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:()=>setSelectedReceipt(null),children:i.jsxs(we.div,{role:"dialog","aria-modal":"true","aria-label":"Comprovante de Transação",className:"bg-[#0f1712] border border-white/15 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl relative",initial:{y:60,opacity:0},animate:{y:0,opacity:1},exit:{y:60,opacity:0},onClick:ev=>ev.stopPropagation(),children:[
+      i.jsxs("div",{className:"flex items-center justify-between pb-4 border-b border-white/10 mb-5",children:[
+        i.jsxs("div",{className:"flex items-center gap-2.5",children:[
+          i.jsx("div",{className:"w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0",style:{backgroundColor:"#b4f045",color:"#0f1712"},children:"V"}),
+          i.jsxs("div",{children:[
+            i.jsx("p",{className:"text-xs font-bold uppercase tracking-wider text-[#b4f045]",children:"Valore Bank • Ag. 0001"}),
+            i.jsx("h3",{className:"text-sm font-black text-white",children:selectedReceipt==="loan"?"Comprovante de Crédito em Conta":"Comprovante de Abertura de Conta"})
+          ]})
+        ]}),
+        i.jsx("button",{type:"button","aria-label":"Fechar comprovante",onClick:()=>setSelectedReceipt(null),className:"w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors",children:i.jsx(Io,{size:18})})
+      ]}),
+      selectedReceipt==="loan"?i.jsxs("div",{className:"text-center py-4 px-3 rounded-2xl mb-5 relative overflow-hidden",style:{background:"linear-gradient(145deg, rgba(180,240,69,0.12) 0%, rgba(46,85,53,0.18) 100%)",border:"1px solid rgba(180,240,69,0.3)"},children:[
+        i.jsxs("div",{className:"inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider mb-2",style:{backgroundColor:"rgba(180,240,69,0.2)",color:"#b4f045"},children:[
+          i.jsx(ht,{size:12,strokeWidth:3}),
+          "Transação Aprovada e Disponível"
+        ]}),
+        i.jsx("p",{className:"text-xs text-white/60 font-medium",children:"Valor líquido creditado"}),
+        i.jsxs("div",{className:"text-3xl sm:text-4xl font-black font-mono my-1 tracking-tight",style:{color:"#b4f045"},children:["+",Ce(o)]}),
+        i.jsx("p",{className:"text-[11px] text-white/70",children:"Liberado na sua Conta Digital para saque imediato via PIX"})
+      ]}):i.jsxs("div",{className:"text-center py-4 px-3 rounded-2xl mb-5 relative overflow-hidden bg-white/[0.04] border border-white/10",children:[
+        i.jsxs("div",{className:"inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider mb-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",children:[
+          i.jsx(ht,{size:12,strokeWidth:3}),
+          "Conta Ativa e Regularizada"
+        ]}),
+        i.jsx("p",{className:"text-xs text-white/60 font-medium",children:"Tarifa de Abertura"}),
+        i.jsx("div",{className:"text-3xl sm:text-4xl font-black font-mono my-1 tracking-tight text-white",children:"R$ 0,00"}),
+        i.jsx("p",{className:"text-[11px] text-emerald-400 font-semibold",children:"Isenção total e vitalícia de mensalidades"})
+      ]}),
+      i.jsxs("div",{className:"space-y-3 bg-white/[0.02] border border-white/[0.08] rounded-2xl p-4 text-xs mb-5",children:[
+        i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+          i.jsx("span",{className:"text-white/50",children:"Tipo de Operação"}),
+          i.jsx("span",{className:"font-bold text-white text-right",children:selectedReceipt==="loan"?"Empréstimo Pessoal Pré-Aprovado":"Abertura de Conta Corrente Digital"})
+        ]}),
+        i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+          i.jsx("span",{className:"text-white/50",children:"Beneficiário / Titular"}),
+          i.jsx("span",{className:"font-bold text-white text-right truncate max-w-[200px]",children:rawCustomerName||"Cliente Valore"})
+        ]}),
+        rawCpf?i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+          i.jsx("span",{className:"text-white/50",children:"CPF do Titular"}),
+          i.jsx("span",{className:"font-mono font-semibold text-white/80",children:rawCpf.length===11?`${rawCpf.slice(0,3)}.***.***-${rawCpf.slice(-2)}`:rawCpf})
+        ]}):null,
+        i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+          i.jsx("span",{className:"text-white/50",children:"Conta Destino"}),
+          i.jsx("span",{className:"font-mono font-semibold text-white",children:"Valore Bank · Ag. 0001 · C/C " + a})
+        ]}),
+        selectedReceipt==="loan"?i.jsxs(i.Fragment,{children:[
+          i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+            i.jsx("span",{className:"text-white/50",children:"Plano Contratado"}),
+            i.jsxs("span",{className:"font-bold text-[#b4f045]",children:[instCount,"x de ",Ce(instVal)]})
+          ]}),
+          i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+            i.jsx("span",{className:"text-white/50",children:"Primeiro Vencimento"}),
+            i.jsxs("span",{className:"font-semibold text-white",children:[dueDate," (Carência de 60 dias)"]})
+          ]}),
+          i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+            i.jsx("span",{className:"text-white/50",children:"Taxa de Juros"}),
+            i.jsx("span",{className:"font-semibold text-white",children:"0,81% a.m. (10,16% a.a.)"})
+          ]}),
+          i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+            i.jsx("span",{className:"text-white/50",children:"Tarifa de Cadastro (TAC)"}),
+            i.jsx("span",{className:"font-bold text-[#b4f045]",children:"ISENTA (R$ 0,00)"})
+          ]})
+        ]}):i.jsxs(i.Fragment,{children:[
+          i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+            i.jsx("span",{className:"text-white/50",children:"Tarifa Mensal de Manutenção"}),
+            i.jsx("span",{className:"font-bold text-emerald-400",children:"Gratuito Vitalício"})
+          ]}),
+          i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+            i.jsx("span",{className:"text-white/50",children:"Pix e Transferências"}),
+            i.jsx("span",{className:"font-bold text-emerald-400",children:"Ilimitadas sem custo"})
+          ]}),
+          i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+            i.jsx("span",{className:"text-white/50",children:"Garantia"}),
+            i.jsx("span",{className:"font-semibold text-white",children:"FGC até R$ 250 mil"})
+          ]})
+        ]}),
+        i.jsxs("div",{className:"flex items-center justify-between py-1 border-b border-white/[0.06]",children:[
+          i.jsx("span",{className:"text-white/50",children:"Data da Operação"}),
+          i.jsx("span",{className:"font-semibold text-white",children:new Date().toLocaleDateString("pt-BR") + " às " + new Date().toLocaleTimeString("pt-BR", {hour:"2-digit",minute:"2-digit"})})
+        ]}),
+        i.jsxs("div",{className:"flex items-start justify-between py-1",children:[
+          i.jsx("span",{className:"text-white/50",children:"Autenticação Digital"}),
+          i.jsx("span",{className:"font-mono text-[10px] text-white/40 text-right select-all break-all",children:"VAL-" + (rawCpf?rawCpf.slice(-4):"8924") + "-" + Date.now().toString(36).toUpperCase() + "-BR"})
+        ]})
+      ]}),
+      i.jsxs("div",{className:"space-y-2.5",children:[
+        selectedReceipt==="loan"?i.jsxs("button",{type:"button",onClick:()=>{setSelectedReceipt(null);openWithdrawModal()},className:"valore-pulse-glow w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-transform active:scale-[0.99]",style:{backgroundColor:"#b4f045",color:"#0f1712",boxShadow:"0 6px 20px rgba(180,240,69,0.3)"},children:[
+          "Transferir este saldo via PIX agora",
+          i.jsx(fr,{size:18})
+        ]}):i.jsxs("button",{type:"button",onClick:()=>{setSelectedReceipt(null);openWithdrawModal()},className:"w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-transform active:scale-[0.99]",style:{backgroundColor:"#b4f045",color:"#0f1712"},children:[
+          "Acessar saldo de " + Ce(o),
+          i.jsx(fr,{size:18})
+        ]}),
+        i.jsx("button",{type:"button",onClick:()=>setSelectedReceipt(null),className:"w-full py-3 rounded-2xl border border-white/10 text-xs font-semibold text-white/60 hover:text-white hover:bg-white/5 transition-colors",children:"Fechar Comprovante"})
+      ]}),
+      i.jsxs("div",{className:"mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-center gap-2 text-[10px] text-white/40 text-center",children:[
+        i.jsx(an,{size:12,className:"text-[#b4f045]"}),
+        "Documento eletrônico regulamentado conforme normas do Banco Central do Brasil."
       ]})
     ]})})
   ]})
