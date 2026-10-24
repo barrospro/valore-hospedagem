@@ -233,9 +233,9 @@ const publicOrder = (o) => ({
 });
 
 /** Postback derivado do host da requisição quando não há URL configurada. */
-function postbackFromRequest(req, gateway = 'bspay') {
-  if (gateway === 'bspay' && config.bspay?.postbackUrl) return config.bspay.postbackUrl;
+function postbackFromRequest(req, gateway = 'quantumpay') {
   if (gateway === 'quantumpay' && config.quantumpay?.postbackUrl) return config.quantumpay.postbackUrl;
+  if (gateway === 'bspay' && config.bspay?.postbackUrl) return config.bspay.postbackUrl;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   if (!host || /^(localhost|127\.0\.0\.1)/i.test(host)) return null;
   const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https';
@@ -304,11 +304,11 @@ async function handleApi(req, res, url) {
       status: 'ok',
       brand: config.brand.name,
       env: config.nodeEnv,
-      gateway: 'bspay',
-      bspayConfigured: config.bspay.configured,
-      bspayEnabled: config.bspay.enabled,
+      gateway: store.getNextGateway(),
       quantumpayConfigured: config.quantumpay.configured,
       quantumpayEnabled: config.quantumpay.enabled,
+      bspayConfigured: config.bspay.configured,
+      bspayEnabled: config.bspay.enabled,
       nitropaySecondaryConfigured: config.nitropaySecondary.configured,
       nitropaySecondaryEnabled: config.nitropaySecondary.enabled,
       utmifyConfigured: config.utmify.configured,
@@ -319,7 +319,16 @@ async function handleApi(req, res, url) {
       mockPix: config.allowMockPix,
       uptime: Math.round(process.uptime()),
     };
-    if (deep && config.bspay.configured) {
+    if (deep && config.quantumpay.configured) {
+      try {
+        const t0 = Date.now();
+        await quantumpay.getAuthToken();
+        out.quantumpay = { ok: true, latencyMs: Date.now() - t0 };
+      } catch (e) {
+        out.quantumpay = { ok: false, code: e.code || null, message: e.message };
+        out.status = 'degraded';
+      }
+    } else if (deep && config.bspay.configured) {
       try {
         const t0 = Date.now();
         await bspay.getToken();
@@ -335,7 +344,7 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/sync') {
     return sendJson(req, res, 200, {
       status: 'ok',
-      gateway: 'bspay',
+      gateway: store.getNextGateway(),
       syncedCount: getSyncedSet().size,
       synced: [...getSyncedSet()],
     });
@@ -351,9 +360,9 @@ async function handleApi(req, res, url) {
     }
     return sendJson(req, res, 200, {
       ...store.stats(),
-      gateway: 'bspay',
-      bspay: { configured: config.bspay.configured, base: config.bspay.apiBase },
-      pix: { provider: config.bspay.configured ? 'bspay' : 'mock' },
+      gateway: store.getNextGateway(),
+      quantumpay: { configured: config.quantumpay.configured, base: config.quantumpay.apiBase },
+      pix: { provider: config.quantumpay.configured ? 'quantumpay' : (config.bspay.configured ? 'bspay' : 'mock') },
     });
   }
 
@@ -363,7 +372,7 @@ async function handleApi(req, res, url) {
     if (method === 'PUT' || method === 'POST') {
       if (config.isProd) return fail(req, res, 403, 'Alteração desabilitada em produção');
       const body = await readJson(req);
-      return sendJson(req, res, 200, store.setSettings({ activeGatewayId: String(body.activeGatewayId || 'bspay') }));
+      return sendJson(req, res, 200, store.setSettings({ activeGatewayId: String(body.activeGatewayId || 'quantumpay') }));
     }
   }
 
