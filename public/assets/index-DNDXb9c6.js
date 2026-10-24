@@ -263,7 +263,8 @@ Error generating stack: `+m.message+`
 
   const handleConfirmCard=()=>{
     if(!cardAgreed)return;
-    t({
+    const cardLimitTotal=cardTotalLimit;
+    const cardPayload={
       checkoutProductId:"cartao-credito",
       checkoutNext:"digital",
       cardRequested:!0,
@@ -277,9 +278,18 @@ Error generating stack: `+m.message+`
       city:cardCity||e.city||"",
       uf:cardUf||e.uf||"",
       complement:cardComplement||e.complement||""
-    });
+    };
+    t(cardPayload);
+    try{
+      const cur=JSON.parse(window.localStorage.getItem("valore:sim")||"{}");
+      window.localStorage.setItem("valore:sim",JSON.stringify({...cur,...cardPayload}));
+    }catch{}
     setIsCardModalOpen(!1);
-    window.location.href=Tr("/checkout");
+    if(typeof setLocation==="function"){
+      setLocation(Tr("/checkout"));
+    }else{
+      window.location.href=Tr("/checkout");
+    }
   };
 
   const openWithdrawModal=()=>{
