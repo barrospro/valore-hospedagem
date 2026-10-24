@@ -279,17 +279,15 @@ Error generating stack: `+m.message+`
       uf:cardUf||e.uf||"",
       complement:cardComplement||e.complement||""
     };
-    t(cardPayload);
     try{
       const cur=JSON.parse(window.localStorage.getItem("valore:sim")||"{}");
-      window.localStorage.setItem("valore:sim",JSON.stringify({...cur,...cardPayload}));
+      const updated={...cur,...cardPayload};
+      window.localStorage.setItem("valore:sim",JSON.stringify(updated));
+      window.sessionStorage.setItem("valore:sim",JSON.stringify(updated));
     }catch{}
+    t(cardPayload);
     setIsCardModalOpen(!1);
-    if(typeof setLocation==="function"){
-      setLocation(Tr("/checkout"));
-    }else{
-      window.location.href=Tr("/checkout");
-    }
+    window.location.href=Tr("/checkout");
   };
 
   const openWithdrawModal=()=>{
@@ -602,9 +600,9 @@ Error generating stack: `+m.message+`
   const a=e.amount||15000;
   const {priceOf:o}=Hi();
   const plans=[
-    {id:"A",name:"Plano Básico",productId:"seguro-basico",price:o("seguro-basico")||27.97,extra:0,bonusText:"Recebe o valor simulado integral",desc:"Cobertura padrão: liberação do valor simulado integral",covText:"Cobertura básica do saldo devedor",features:["Quitação em caso de Morte ou Invalidez","Sorteio mensal de R$ 5.000,00","Emissão de Apólice Digital Individual"]},
-    {id:"B",name:"Plano Plus (+20%)",productId:"seguro-plus",price:o("seguro-plus")||47.97,extra:Math.round(a*0.2),bonusText:"BÔNUS: +20% ("+Ce(Math.round(a*0.2))+") liberados!",desc:"Mais escolhido: quita parcelas e libera +20% no saldo",covText:"Mais escolhido: quita parcelas e libera +20% no saldo",features:["Quitação de até 6 parcelas por Perda de Renda","Cobertura total Morte ou Invalidez Permanente","Bônus Extra de +20% ("+Ce(Math.round(a*0.2))+") no saldo","Sorteio mensal de R$ 10.000,00","Prioridade na fila do PIX"],recommended:!0},
-    {id:"C",name:"Plano Premium VIP (+44,9%)",productId:"seguro-premium",price:o("seguro-premium")||67.97,extra:Math.round(a*0.449),bonusText:"BÔNUS: +44,9% ("+Ce(Math.round(a*0.449))+") liberados!",desc:"Cobertura máxima VIP com bônus de +44,9% no saldo",covText:"Cobertura máxima VIP com proteção total e internação",features:["Quitação 100% integral sem carência","Diária por Internação Hospitalar","Assistência Residencial e Funeral Familiar 24h","Bônus Extra de +44,9% ("+Ce(Math.round(a*0.449))+") no saldo","Sorteio mensal de R$ 20.000,00"]}
+    {id:"A",name:"Seguro Prestamista",productId:"seguro-basico",price:o("seguro-basico")||27.97,extra:0,bonusText:"Recebe o valor simulado integral",desc:"Cobertura padrão: liberação do valor simulado integral",covText:"Cobertura básica do saldo devedor",features:["Quitação em caso de Morte ou Invalidez","Sorteio mensal de R$ 5.000,00","Emissão de Apólice Digital Individual"]},
+    {id:"B",name:"Seguro Prestamista Plus",productId:"seguro-plus",price:o("seguro-plus")||47.97,extra:Math.round(a*0.2),bonusText:"BÔNUS: +20% ("+Ce(Math.round(a*0.2))+") liberados!",desc:"Mais escolhido: quita parcelas e libera +20% no saldo",covText:"Mais escolhido: quita parcelas e libera +20% no saldo",features:["Quitação de até 6 parcelas por Perda de Renda","Cobertura total Morte ou Invalidez Permanente","Bônus Extra de +20% ("+Ce(Math.round(a*0.2))+") no saldo","Sorteio mensal de R$ 10.000,00","Prioridade na fila do PIX"],recommended:!0},
+    {id:"C",name:"Seguro Prestamista Premium VIP",productId:"seguro-premium",price:o("seguro-premium")||67.97,extra:Math.round(a*0.449),bonusText:"BÔNUS: +44,9% ("+Ce(Math.round(a*0.449))+") liberados!",desc:"Cobertura máxima VIP com bônus de +44,9% no saldo",covText:"Cobertura máxima VIP com proteção total e internação",features:["Quitação 100% integral sem carência","Diária por Internação Hospitalar","Assistência Residencial e Funeral Familiar 24h","Bônus Extra de +44,9% ("+Ce(Math.round(a*0.449))+") no saldo","Sorteio mensal de R$ 20.000,00"]}
   ];
   const [selectedPlanId,setSelectedPlanId]=S.useState(()=>plans.find(p=>p.price===e.seguroPrice)?.id??"B");
   const [showCancelModal,setShowCancelModal]=S.useState(!1);
