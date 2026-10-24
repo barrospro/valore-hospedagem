@@ -941,6 +941,108 @@
       .valore-inline-chat-card:hover {
         background: #dcfce7;
       }
+
+      /* Pulse Glow fluído no botão de transferência */
+      @keyframes valorePulseGlow {
+        0%, 100% {
+          box-shadow: 0 8px 30px rgba(180, 240, 69, 0.35);
+          transform: scale(1);
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(180, 240, 69, 0.65), 0 8px 35px rgba(180, 240, 69, 0.45);
+          transform: scale(1.015);
+        }
+      }
+      .valore-pulse-glow {
+        animation: valorePulseGlow 2.5s ease-in-out infinite !important;
+      }
+
+      /* Modais Fintech Dark Mode */
+      .valore-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 0;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+      @media (min-width: 640px) {
+        .valore-modal-backdrop {
+          align-items: center;
+          padding: 20px;
+        }
+      }
+      .valore-modal-backdrop.valore-modal-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .valore-modal-sheet {
+        background: #0f1712;
+        border: 1px solid rgba(180, 240, 69, 0.25);
+        width: 100%;
+        max-width: 440px;
+        border-radius: 28px 28px 0 0;
+        padding: 24px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.9), 0 0 30px rgba(180, 240, 69, 0.12);
+        color: #ffffff;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @media (min-width: 640px) {
+        .valore-modal-sheet {
+          border-radius: 28px;
+          transform: translateY(30px);
+        }
+      }
+      .valore-modal-backdrop.valore-modal-open .valore-modal-sheet {
+        transform: translateY(0);
+      }
+      .valore-sheet-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+      .valore-sheet-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #ffffff;
+      }
+      .valore-sheet-subtitle {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #b4f045;
+      }
+      .valore-sheet-close {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 20px;
+        line-height: 1;
+        transition: all 0.15s ease;
+      }
+      .valore-sheet-close:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+      }
     </style>
     <script>
       (function() {
@@ -1632,23 +1734,188 @@
           }
         }
 
+        // ------------------------- APP DIGITAL ACCOUNT CRO ENHANCEMENTS -------------------------
+        // Feedback háptico global
+        document.addEventListener('click', function(ev) {
+          var btn = ev.target && ev.target.closest('button, a, [role="button"], .valore-opt-btn');
+          if (btn && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            try { navigator.vibrate(15); } catch(e) {}
+          }
+        }, { passive: true });
+
+        function isAppScreen() {
+          try {
+            var bodyText = (document.body && (document.body.innerText || document.body.textContent)) || '';
+            return bodyText.indexOf('Conta Digital Ativa') !== -1 || bodyText.indexOf('Saldo disponível para saque') !== -1;
+          } catch(e) {
+            return false;
+          }
+        }
+
+        function closeFintechModal() {
+          var modal = document.getElementById('valore-fintech-modal');
+          if (modal) {
+            modal.classList.remove('valore-modal-open');
+            setTimeout(function() {
+              if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+            }, 260);
+          }
+        }
+
+        function triggerTransferAction() {
+          var allButtons = document.querySelectorAll('button');
+          for (var i = 0; i < allButtons.length; i++) {
+            var txt = allButtons[i].textContent || '';
+            if (txt.indexOf('Transferir meu saldo via PIX') !== -1 || txt.indexOf('Sacar PIX') !== -1) {
+              allButtons[i].click();
+              return;
+            }
+          }
+        }
+
+        function openNotificationModal() {
+          closeFintechModal();
+          var info = getCustomerInfo();
+          var backdrop = document.createElement('div');
+          backdrop.id = 'valore-fintech-modal';
+          backdrop.className = 'valore-modal-backdrop';
+          backdrop.innerHTML = '<div class="valore-modal-sheet" onclick="event.stopPropagation()">' +
+            '<div class="valore-sheet-header">' +
+            '<div><div class="valore-sheet-subtitle">Valore Bank • Notificações</div><div class="valore-sheet-title">Central de Avisos</div></div>' +
+            '<button type="button" class="valore-sheet-close" id="valore-modal-close-btn">&times;</button>' +
+            '</div>' +
+            '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:16px;margin-bottom:14px;display:flex;gap:12px;align-items:flex-start">' +
+            '<div style="width:38px;height:38px;border-radius:12px;background:rgba(180,240,69,0.15);color:#b4f045;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔔</div>' +
+            '<div style="flex:1;min-width:0">' +
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">' +
+            '<strong style="font-size:13px;color:#fff">Crédito Liberado para Saque</strong>' +
+            '<span style="font-size:10px;color:rgba(255,255,255,0.4)">Agora</span>' +
+            '</div>' +
+            '<p style="font-size:12px;color:rgba(255,255,255,0.7);line-height:1.45;margin:0 0 10px 0">Olá, <strong>' + info.firstName + '</strong>! Seu crédito de <strong>' + info.amountFormatted + '</strong> está pré-aprovado na sua conta digital e pronto para envio via PIX.</p>' +
+            '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(180,240,69,0.12);padding:4px 10px;border-radius:8px;font-size:11px;font-weight:700;color:#b4f045">✓ Chave PIX pronta para sincronização</div>' +
+            '</div>' +
+            '</div>' +
+            '<button type="button" id="valore-notif-transfer-cta" style="width:100%;padding:14px;background:#b4f045;color:#0f1712;font-size:14px;font-weight:800;border:none;border-radius:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 6px 20px rgba(180,240,69,0.3)"><span>Transferir ' + info.amountFormatted + ' via PIX</span> →</button>' +
+            '</div>';
+
+          document.body.appendChild(backdrop);
+          setTimeout(function() { backdrop.classList.add('valore-modal-open'); }, 10);
+
+          backdrop.addEventListener('click', closeFintechModal);
+          var closeBtn = document.getElementById('valore-modal-close-btn');
+          if (closeBtn) closeBtn.addEventListener('click', closeFintechModal);
+          var ctaBtn = document.getElementById('valore-notif-transfer-cta');
+          if (ctaBtn) {
+            ctaBtn.addEventListener('click', function() {
+              closeFintechModal();
+              triggerTransferAction();
+            });
+          }
+        }
+
+        function openExtratoModal() {
+          closeFintechModal();
+          var info = getCustomerInfo();
+          var backdrop = document.createElement('div');
+          backdrop.id = 'valore-fintech-modal';
+          backdrop.className = 'valore-modal-backdrop';
+          backdrop.innerHTML = '<div class="valore-modal-sheet" onclick="event.stopPropagation()">' +
+            '<div class="valore-sheet-header">' +
+            '<div><div class="valore-sheet-subtitle">Valore Bank • Ag. 0001</div><div class="valore-sheet-title">Extrato da Conta Digital</div></div>' +
+            '<button type="button" class="valore-sheet-close" id="valore-modal-close-btn">&times;</button>' +
+            '</div>' +
+            '<div style="background:linear-gradient(135deg, rgba(180,240,69,0.12) 0%, rgba(46,85,53,0.18) 100%);border:1px solid rgba(180,240,69,0.3);border-radius:18px;padding:16px;margin-bottom:16px">' +
+            '<div style="font-size:11px;color:rgba(255,255,255,0.6);text-transform:uppercase;font-weight:700">Saldo Disponível para Saque</div>' +
+            '<div style="font-size:28px;font-weight:900;color:#b4f045;font-family:monospace;margin:4px 0 6px 0">' + info.amountFormatted + '</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#b4f045"></span> Titular: <strong>' + info.fullName + '</strong></div>' +
+            '</div>' +
+            '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;margin-bottom:10px">Lançamentos Recentes</div>' +
+            '<div style="margin-bottom:18px">' +
+            '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+            '<div><div style="font-size:13px;font-weight:700;color:#fff">Empréstimo Pessoal Aprovado</div><div style="font-size:11px;color:rgba(255,255,255,0.4)">Crédito em conta corrente • Hoje</div></div>' +
+            '<div style="text-align:right"><div style="font-size:14px;font-weight:900;color:#b4f045;font-family:monospace">+' + info.amountFormatted + '</div><div style="font-size:10px;color:#86efac;font-weight:700">Disponível</div></div>' +
+            '</div>' +
+            '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px;display:flex;justify-content:space-between;align-items:center">' +
+            '<div><div style="font-size:13px;font-weight:700;color:#fff">Abertura de Conta Digital</div><div style="font-size:11px;color:rgba(255,255,255,0.4)">Tarifa Zero e Isenção Vitalícia</div></div>' +
+            '<div style="text-align:right"><div style="font-size:14px;font-weight:900;color:rgba(255,255,255,0.7);font-family:monospace">R$ 0,00</div><div style="font-size:10px;color:rgba(255,255,255,0.4)">Gratuito</div></div>' +
+            '</div>' +
+            '</div>' +
+            '<button type="button" id="valore-extrato-transfer-cta" style="width:100%;padding:14px;background:#b4f045;color:#0f1712;font-size:14px;font-weight:800;border:none;border-radius:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 6px 20px rgba(180,240,69,0.3)"><span>Sacar ' + info.amountFormatted + ' via PIX Agora</span> →</button>' +
+            '</div>';
+
+          document.body.appendChild(backdrop);
+          setTimeout(function() { backdrop.classList.add('valore-modal-open'); }, 10);
+
+          backdrop.addEventListener('click', closeFintechModal);
+          var closeBtn = document.getElementById('valore-modal-close-btn');
+          if (closeBtn) closeBtn.addEventListener('click', closeFintechModal);
+          var ctaBtn = document.getElementById('valore-extrato-transfer-cta');
+          if (ctaBtn) {
+            ctaBtn.addEventListener('click', function() {
+              closeFintechModal();
+              triggerTransferAction();
+            });
+          }
+        }
+
+        function enhanceAppScreen() {
+          if (!isAppScreen()) return;
+
+          var allButtons = document.querySelectorAll('button');
+          var transferBtn = null;
+          var extratoBtn = null;
+          for (var i = 0; i < allButtons.length; i++) {
+            var txt = allButtons[i].textContent || '';
+            if (txt.indexOf('Transferir meu saldo via PIX') !== -1) {
+              transferBtn = allButtons[i];
+              if (!transferBtn.classList.contains('valore-pulse-glow')) {
+                transferBtn.classList.add('valore-pulse-glow');
+              }
+            } else if (txt.trim() === 'Extrato' || (txt.indexOf('Extrato') !== -1 && txt.indexOf('Extrato da Conta') === -1)) {
+              extratoBtn = allButtons[i];
+            }
+          }
+
+          var bellBtn = document.querySelector('button[aria-label="Notificações"]');
+          if (bellBtn && !bellBtn.dataset.valoreBound) {
+            bellBtn.dataset.valoreBound = 'true';
+            bellBtn.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              openNotificationModal();
+            });
+          }
+
+          if (extratoBtn && !extratoBtn.dataset.valoreBound) {
+            extratoBtn.dataset.valoreBound = 'true';
+            extratoBtn.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              openExtratoModal();
+            }, true);
+          }
+        }
+
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', function() {
             initExitIntent();
             initTypebotChat();
             initWebPushAuto();
             enhanceAtivarPush();
+            enhanceAppScreen();
           });
         } else {
           initExitIntent();
           initTypebotChat();
           initWebPushAuto();
           enhanceAtivarPush();
+          enhanceAppScreen();
         }
 
         setInterval(function() {
           enhanceAtivarPush();
-        }, 1500);
+          enhanceAppScreen();
+        }, 1000);
       })();
     </script>
     <!-- End Checkout CRO Enhancements -->
