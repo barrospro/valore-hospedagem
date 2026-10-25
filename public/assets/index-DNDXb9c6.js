@@ -405,7 +405,6 @@ Error generating stack: `+m.message+`
     return day+"/"+month+"/"+year;
   },[]);
   const [showBalance,setShowBalance]=S.useState(!0);
-  const [showProfileModal,setShowProfileModal]=S.useState(!1);
   const [isModalOpen,setIsModalOpen]=S.useState(!1);
   const [modalStep,setModalStep]=S.useState("form");
   const [procStage,setProcStage]=S.useState(0);
@@ -593,305 +592,134 @@ Error generating stack: `+m.message+`
     {icon:_C,label:"Cartão",badge:"Limite Disponivel",primary:!1,onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};openCardModal()},disabled:!1}
   ];
 
-  return i.jsxs("div",{className:"min-h-dvh bg-[#0a0f0d] text-white selection:bg-[#b4f045] selection:text-[#0a0f0d] pb-24 font-sans relative overflow-x-hidden",children:[
-    i.jsx("div",{className:"fixed inset-0 pointer-events-none overflow-hidden",children:i.jsx("div",{className:"absolute -top-32 right-[-20%] w-[70%] h-[500px] rounded-full blur-[140px] opacity-20",style:{background:"radial-gradient(circle, #b4f045 0%, #2e5535 70%, transparent 100%)"}})}),
-    i.jsxs("div",{className:"relative max-w-md mx-auto px-4 pt-4 space-y-4 z-10",children:[
-
-      /* 1. TOP CARD (CONTA) */
-      i.jsxs("div",{className:"bg-[#121814] border border-[#232d26] rounded-3xl p-5 shadow-lg relative",children:[
-        i.jsxs("div",{className:"flex items-start justify-between",children:[
+  return i.jsxs("div",{className:"min-h-dvh bg-[#0b120d] text-white selection:bg-primary selection:text-[#0f1712] relative overflow-x-hidden",children:[
+    i.jsx("div",{className:"fixed inset-0 pointer-events-none overflow-hidden",children:i.jsx("div",{className:"absolute -top-32 right-[-20%] w-[70%] h-[500px] rounded-full blur-[140px] opacity-25",style:{background:"radial-gradient(circle, #b4f045 0%, #2e5535 70%, transparent 100%)"}})}),
+    i.jsxs("div",{className:"relative max-w-md mx-auto px-5 pb-16 pt-6 z-10",children:[
+      i.jsxs("header",{className:"flex items-center justify-between pb-6",children:[
+        i.jsxs("div",{className:"flex items-center gap-3",children:[
+          i.jsx("div",{className:"w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-md",style:{backgroundColor:"#b4f045",color:"#0f1712"},children:r.charAt(0).toUpperCase()}),
           i.jsxs("div",{children:[
-            i.jsxs("div",{className:"flex items-center gap-1.5 mb-0.5",children:[
-              i.jsx("span",{className:"font-black text-lg text-white tracking-tight",children:"valore."}),
-              i.jsx("span",{className:"text-xs text-white/50 font-medium",children:"• Conta"})
+            i.jsxs("div",{className:"flex items-center gap-1.5",children:[
+              i.jsx("p",{className:"text-xs font-semibold uppercase tracking-wider text-[#b4f045]",children:"Conta Digital Ativa"}),
+              i.jsx("span",{className:"w-1.5 h-1.5 rounded-full bg-[#b4f045] animate-ping"})
             ]}),
-            i.jsxs("p",{className:"text-xs text-white/40 font-medium",children:["Ag. 0001 • Conta ",a]})
-          ]}),
-          i.jsx("button",{
-            type:"button",
-            onClick:()=>setShowBalance(!showBalance),
-            className:"text-white/60 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/5",
-            children:showBalance
-              ?i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-                  i.jsx("path",{d:"M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"}),
-                  i.jsx("circle",{cx:"12",cy:"12",r:"3"})
-                ]})
-              :i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-                  i.jsx("path",{d:"M9.88 9.88a3 3 0 1 0 4.24 4.24"}),
-                  i.jsx("path",{d:"M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"}),
-                  i.jsx("path",{d:"M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"}),
-                  i.jsx("line",{x1:"2",x2:"22",y1:"2",y2:"22"})
-                ]})
-          })
-        ]}),
-        i.jsx("p",{className:"text-xs text-white/50 font-medium mt-4",children:"Saldo disponível"}),
-        i.jsx("h2",{className:"text-3xl md:text-4xl font-extrabold text-white tracking-tight mt-1 mb-2 font-mono",children:showBalance?Ce(o):"••••••••"}),
-        i.jsx("div",{className:"inline-flex items-center gap-1.5 mt-0.5",children:
-          i.jsx("span",{className:"text-xs font-semibold text-[#b4f045]",children:"Rendendo 100% do CDI"})
-        })
-      ]}),
-
-      /* 2. QUICK ACTIONS (4 GRID) */
-      i.jsxs("div",{className:"grid grid-cols-4 gap-2.5",children:[
-        i.jsxs("button",{type:"button",onClick:openWithdrawModal,className:"bg-[#121814] border border-[#232d26] hover:border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 group",children:[
-          i.jsx("div",{className:"w-11 h-11 rounded-full bg-[#b4f045] text-black flex items-center justify-center font-bold shadow-md shadow-[#b4f045]/15",children:
-            i.jsxs("svg",{className:"w-5 h-5 stroke-[2.5]",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeLinecap:"round",strokeLinejoin:"round",children:[
-              i.jsx("line",{x1:"7",y1:"17",x2:"17",y2:"7"}),
-              i.jsx("polyline",{points:"7 7 17 7 17 17"})
-            ]})
-          }),
-          i.jsx("span",{className:"text-xs font-semibold text-white/90 text-center leading-tight",children:"Sacar PIX"})
-        ]}),
-        i.jsxs("button",{type:"button",onClick:openWithdrawModal,className:"bg-[#121814] border border-[#232d26] hover:border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 group",children:[
-          i.jsx("div",{className:"w-11 h-11 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#b4f045]",children:
-            i.jsx("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",children:
-              i.jsx("path",{d:"M3 5v14M8 5v14M12 5v14M17 5v14M21 5v14"})
-            })
-          }),
-          i.jsx("span",{className:"text-xs font-semibold text-white/90 text-center leading-tight",children:"Pagar"})
-        ]}),
-        i.jsxs("button",{type:"button",onClick:openWithdrawModal,className:"bg-[#121814] border border-[#232d26] hover:border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 group",children:[
-          i.jsx("div",{className:"w-11 h-11 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#b4f045]",children:
-            i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-              i.jsx("path",{d:"m16 3 4 4-4 4"}),
-              i.jsx("path",{d:"M20 7H4"}),
-              i.jsx("path",{d:"m8 21-4-4 4-4"}),
-              i.jsx("path",{d:"M4 17h16"})
-            ]})
-          }),
-          i.jsx("span",{className:"text-xs font-semibold text-white/90 text-center leading-tight",children:"Transferir"})
-        ]}),
-        i.jsxs("button",{type:"button",onClick:()=>{window.openReceiptModal?window.openReceiptModal("loan"):openWithdrawModal()},className:"bg-[#121814] border border-[#232d26] hover:border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 group",children:[
-          i.jsx("div",{className:"w-11 h-11 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#b4f045]",children:
-            i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-              i.jsx("path",{d:"M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"}),
-              i.jsx("path",{d:"M12 8v8"}),
-              i.jsx("path",{d:"M9.5 10a2.5 2.5 0 0 1 5 0c0 1.5-1.5 2-2.5 2s-2.5.5-2.5 2a2.5 2.5 0 0 0 5 0"})
-            ]})
-          }),
-          i.jsx("span",{className:"text-xs font-semibold text-white/90 text-center leading-tight",children:"Extrato"})
-        ]})
-      ]}),
-
-      /* 3. PRIMARY CTA BANNER */
-      i.jsxs("button",{
-        type:"button",
-        onClick:openWithdrawModal,
-        className:"w-full py-4 px-5 rounded-2xl bg-[#b4f045] hover:bg-[#a3e635] text-black font-extrabold flex items-center justify-between shadow-lg shadow-[#b4f045]/15 active:scale-[0.99] transition-all cursor-pointer",
-        children:[
-          i.jsxs("div",{className:"flex items-center gap-3",children:[
-            i.jsxs("svg",{className:"w-5 h-5 -rotate-45",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2.5",strokeLinecap:"round",strokeLinejoin:"round",children:[
-              i.jsx("path",{d:"m22 2-7 20-4-9-9-4Z"}),
-              i.jsx("path",{d:"M22 2 11 13"})
-            ]}),
-            i.jsx("span",{className:"text-sm md:text-base font-extrabold tracking-tight",children:"Sacar meu dinheiro via PIX"})
-          ]}),
-          i.jsx("svg",{className:"w-5 h-5 stroke-[2.5]",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeLinecap:"round",strokeLinejoin:"round",children:
-            i.jsx("polyline",{points:"9 18 15 12 9 6"})
-          })
-        ]
-      }),
-
-      /* 4. MOVIMENTAÇÕES */
-      i.jsxs("div",{className:"pt-1",children:[
-        i.jsx("h3",{className:"text-xs md:text-sm font-semibold text-white/70 uppercase tracking-wider mb-2.5 px-0.5",children:"Movimentações"}),
-        i.jsxs("div",{
-          onClick:()=>{window.openReceiptModal?window.openReceiptModal("loan"):openWithdrawModal()},
-          className:"bg-[#121814] border border-[#232d26] rounded-2xl p-4 flex items-center justify-between hover:border-white/10 transition-colors cursor-pointer",
-          children:[
-            i.jsxs("div",{className:"flex items-center gap-3",children:[
-              i.jsx("div",{className:"w-10 h-10 rounded-full bg-[#1b2b1e] text-[#b4f045] flex items-center justify-center shrink-0",children:
-                i.jsxs("svg",{className:"w-5 h-5 stroke-[2.5]",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeLinecap:"round",strokeLinejoin:"round",children:[
-                  i.jsx("line",{x1:"17",y1:"7",x2:"7",y2:"17"}),
-                  i.jsx("polyline",{points:"17 17 7 17 7 7"})
-                ]})
-              }),
-              i.jsxs("div",{children:[
-                i.jsx("p",{className:"font-semibold text-white text-sm",children:"Empréstimo Valore"}),
-                i.jsx("p",{className:"text-xs text-white/40",children:"Valor liberado"})
-              ]})
-            ]}),
-            i.jsxs("div",{className:"text-right",children:[
-              i.jsxs("p",{className:"font-bold text-[#b4f045] text-sm",children:["+",Ce(o)]}),
-              i.jsx("p",{className:"text-xs text-white/40",children:"Hoje"})
-            ]})
-          ]
-        })
-      ]}),
-
-      /* 5. SEU EMPRÉSTIMO CARD */
-      i.jsxs("div",{className:"bg-[#121814] border border-[#232d26] rounded-3xl p-5 shadow-sm",children:[
-        i.jsxs("div",{className:"flex items-center justify-between",children:[
-          i.jsx("h3",{className:"font-bold text-white text-base",children:"Seu empréstimo"}),
-          i.jsxs("button",{
-            type:"button",
-            onClick:openWithdrawModal,
-            className:"bg-[#b4f045] hover:bg-[#a3e635] text-black text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1 active:scale-95 transition-all cursor-pointer",
-            children:[
-              i.jsx("span",{children:"Sacar"}),
-              i.jsx("svg",{className:"w-3.5 h-3.5 stroke-[2.5]",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeLinecap:"round",strokeLinejoin:"round",children:
-                i.jsx("polyline",{points:"9 18 15 12 9 6"})
-              })
-            ]
-          })
-        ]}),
-        i.jsx("p",{className:"text-xs text-white/40 mt-1",children:"Valor disponível"}),
-        i.jsx("p",{className:"text-2xl md:text-3xl font-extrabold text-white mt-1 mb-4 font-mono",children:Ce(o)}),
-        i.jsxs("div",{className:"pt-3.5 border-t border-white/[0.06] flex items-center justify-between text-xs",children:[
-          i.jsx("span",{className:"text-white/40",children:"Próximo vencimento"}),
-          i.jsxs("span",{className:"font-semibold text-white",children:[dueDate," • parcela em dia"]})
-        ]})
-      ]}),
-
-      /* 6. SERVIÇOS DA CONTA */
-      i.jsxs("div",{className:"pt-1 space-y-2.5",children:[
-        i.jsx("h3",{className:"text-xs md:text-sm font-semibold text-white/70 uppercase tracking-wider mb-2.5 px-0.5",children:"Serviços da conta"}),
-        
-        /* Item 1: Cartões */
-        i.jsxs("div",{
-          onClick:openCardModal,
-          className:"bg-[#121814] border border-[#232d26] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:border-white/10 transition-colors",
-          children:[
-            i.jsxs("div",{className:"flex items-center gap-3",children:[
-              i.jsx("div",{className:"w-10 h-10 rounded-full bg-[#1b2b1e] text-[#b4f045] flex items-center justify-center shrink-0",children:
-                i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-                  i.jsx("rect",{width:"20",height:"14",x:"2",y:"5",rx:"2"}),
-                  i.jsx("line",{x1:"2",x2:"22",y1:"10",y2:"10"})
-                ]})
-              }),
-              i.jsxs("div",{children:[
-                i.jsx("p",{className:"font-semibold text-white text-sm",children:"Cartões"}),
-                i.jsx("p",{className:"text-xs text-white/40",children:"Cartão sem anuidade, com limite pré-aprovado"})
-              ]})
-            ]}),
-            i.jsx("svg",{className:"w-5 h-5 text-white/30",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:
-              i.jsx("polyline",{points:"9 18 15 12 9 6"})
-            })
-          ]
-        }),
-
-        /* Item 2: Empréstimos */
-        i.jsxs("div",{
-          onClick:openWithdrawModal,
-          className:"bg-[#121814] border border-[#232d26] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:border-white/10 transition-colors",
-          children:[
-            i.jsxs("div",{className:"flex items-center gap-3",children:[
-              i.jsx("div",{className:"w-10 h-10 rounded-full bg-[#1b2b1e] text-[#b4f045] flex items-center justify-center shrink-0",children:
-                i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-                  i.jsx("line",{x1:"19",x2:"5",y1:"5",y2:"19"}),
-                  i.jsx("circle",{cx:"6.5",cy:"6.5",r:"2.5"}),
-                  i.jsx("circle",{cx:"17.5",cy:"17.5",r:"2.5"})
-                ]})
-              }),
-              i.jsxs("div",{children:[
-                i.jsx("p",{className:"font-semibold text-white text-sm",children:"Empréstimos"}),
-                i.jsx("p",{className:"text-xs text-white/40",children:"Gerencie ou solicite novos valores"})
-              ]})
-            ]}),
-            i.jsx("svg",{className:"w-5 h-5 text-white/30",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:
-              i.jsx("polyline",{points:"9 18 15 12 9 6"})
-            })
-          ]
-        }),
-
-        /* Item 3: Investimentos */
-        i.jsxs("div",{
-          onClick:()=>{openWithdrawModal()},
-          className:"bg-[#121814] border border-[#232d26] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:border-white/10 transition-colors",
-          children:[
-            i.jsxs("div",{className:"flex items-center gap-3",children:[
-              i.jsx("div",{className:"w-10 h-10 rounded-full bg-[#1b2b1e] text-[#b4f045] flex items-center justify-center shrink-0",children:
-                i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-                  i.jsx("polyline",{points:"22 7 13.5 15.5 8.5 10.5 2 17"}),
-                  i.jsx("polyline",{points:"16 7 22 7 22 13"})
-                ]})
-              }),
-              i.jsxs("div",{children:[
-                i.jsx("p",{className:"font-semibold text-white text-sm",children:"Investimentos"}),
-                i.jsx("p",{className:"text-xs text-white/40",children:"Faça o saldo render 100% do CDI"})
-              ]})
-            ]}),
-            i.jsx("svg",{className:"w-5 h-5 text-white/30",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:
-              i.jsx("polyline",{points:"9 18 15 12 9 6"})
-            })
-          ]
-        })
-      ]})
-    ]}),
-
-    /* 7. FIXED BOTTOM TAB BAR */
-    i.jsx("div",{className:"fixed bottom-0 inset-x-0 bg-[#0d140f]/95 backdrop-blur-md border-t border-[#1d2720] py-2 px-6 z-40",children:[
-      i.jsxs("div",{className:"max-w-md mx-auto flex items-center justify-around",children:[
-        i.jsxs("button",{type:"button",className:"flex flex-col items-center gap-1 text-[#b4f045]",children:[
-          i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-            i.jsx("path",{d:"m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"}),
-            i.jsx("polyline",{points:"9 22 9 12 15 12 15 22"})
-          ]}),
-          i.jsx("span",{className:"text-[11px] font-semibold",children:"Início"})
-        ]}),
-        i.jsxs("button",{type:"button",onClick:openWithdrawModal,className:"flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors cursor-pointer",children:[
-          i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-            i.jsx("path",{d:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"}),
-            i.jsx("polyline",{points:"7 10 12 15 17 10"}),
-            i.jsx("line",{x1:"12",x2:"12",y1:"15",y2:"3"})
-          ]}),
-          i.jsx("span",{className:"text-[11px] font-medium",children:"Saque"})
-        ]}),
-        i.jsxs("button",{type:"button",onClick:()=>setShowProfileModal(!0),className:"flex flex-col items-center gap-1 text-white/40 hover:text-white transition-colors cursor-pointer",children:[
-          i.jsxs("svg",{className:"w-5 h-5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-            i.jsx("path",{d:"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"}),
-            i.jsx("circle",{cx:"12",cy:"7",r:"4"})
-          ]}),
-          i.jsx("span",{className:"text-[11px] font-medium",children:"Meus dados"})
-        ]})
-      ]})
-    ]}),
-
-    /* MEUS DADOS MODAL */
-    showProfileModal&&i.jsx("div",{className:"fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200",onClick:()=>setShowProfileModal(!1),children:
-      i.jsxs("div",{className:"bg-[#121814] border border-[#232d26] rounded-3xl p-6 max-w-sm w-full space-y-4 text-left shadow-2xl",onClick:s=>s.stopPropagation(),children:[
-        i.jsxs("div",{className:"flex items-center justify-between pb-3 border-b border-white/10",children:[
-          i.jsxs("div",{className:"flex items-center gap-2.5",children:[
-            i.jsx("div",{className:"w-9 h-9 rounded-full bg-[#b4f045] text-black font-bold flex items-center justify-center text-sm",children:r.charAt(0).toUpperCase()}),
-            i.jsxs("div",{children:[
-              i.jsx("p",{className:"font-bold text-white text-sm",children:rawCustomerName||"Cliente"}),
-              i.jsx("p",{className:"text-xs text-white/50",children:"Conta Digital Ativa"})
-            ]})
-          ]}),
-          i.jsx("button",{type:"button",onClick:()=>setShowProfileModal(!1),className:"text-white/40 hover:text-white text-lg",children:"✕"})
-        ]}),
-        i.jsxs("div",{className:"space-y-3 text-xs",children:[
-          i.jsxs("div",{className:"flex justify-between",children:[
-            i.jsx("span",{className:"text-white/40",children:"Instituição"}),
-            i.jsx("span",{className:"font-semibold text-white",children:"Valore Bank S.A."})
-          ]}),
-          i.jsxs("div",{className:"flex justify-between",children:[
-            i.jsx("span",{className:"text-white/40",children:"Agência"}),
-            i.jsx("span",{className:"font-semibold text-white",children:"0001"})
-          ]}),
-          i.jsxs("div",{className:"flex justify-between",children:[
-            i.jsx("span",{className:"text-white/40",children:"Conta corrente"}),
-            i.jsx("span",{className:"font-semibold text-[#b4f045]",children:a})
-          ]}),
-          i.jsxs("div",{className:"flex justify-between",children:[
-            i.jsx("span",{className:"text-white/40",children:"CPF do titular"}),
-            i.jsx("span",{className:"font-semibold text-white",children:rawCpf?rawCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4"):e.cpf||"***"})
-          ]}),
-          i.jsxs("div",{className:"flex justify-between",children:[
-            i.jsx("span",{className:"text-white/40",children:"Saldo liberado"}),
-            i.jsx("span",{className:"font-bold text-[#b4f045]",children:Ce(o)})
+            i.jsxs("p",{className:"font-bold text-base leading-tight text-white",children:["Olá, ",r]})
           ]})
         ]}),
-        i.jsx("button",{
-          type:"button",
-          onClick:()=>setShowProfileModal(!1),
-          className:"w-full py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs transition-colors",
-          children:"Fechar"
-        })
+        i.jsxs("div",{className:"flex items-center gap-2",children:[
+          i.jsx(nr,{variant:"dark",className:"text-xl opacity-90"}),
+          i.jsxs("button",{"aria-label":"Notificações",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};if(window.openNotificationModal)window.openNotificationModal()},className:"relative w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors",children:[
+            i.jsx(rv,{size:18,className:"text-white/80"}),
+            i.jsx("span",{className:"absolute top-2.5 right-2.5 w-2 h-2 rounded-full",style:{backgroundColor:"#b4f045"}})
+          ]})
+        ]})
+      ]}),
+      i.jsxs(we.div,{initial:{opacity:0,y:16},animate:{opacity:1,y:0},transition:{duration:0.4},className:"rounded-3xl p-6 relative overflow-hidden",style:{background:"linear-gradient(145deg, #132418 0%, #0d1a12 50%, #08100b 100%)",border:"1px solid rgba(180, 240, 69, 0.28)",boxShadow:"0 16px 40px -10px rgba(0,0,0,0.7), 0 0 25px rgba(180,240,69,0.12)"},children:[
+        i.jsx("div",{className:"absolute -top-16 -right-16 w-48 h-48 rounded-full blur-[80px] pointer-events-none",style:{backgroundColor:"rgba(180, 240, 69, 0.16)"}}),
+        i.jsxs("div",{className:"relative z-10",children:[
+          i.jsxs("div",{className:"flex items-center justify-between mb-2",children:[
+            i.jsxs("div",{className:"flex items-center gap-2 text-xs font-semibold text-white/60",children:[
+              i.jsx(an,{size:14,className:"text-[#b4f045]"}),
+              "Valore Bank · Ag. 0001 · C/C " + a
+            ]}),
+            i.jsx("button",{"aria-label":showBalance?"Ocultar saldo":"Mostrar saldo",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(10)}catch(e){};setShowBalance(b=>!b)},className:"w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 transition-colors",children:showBalance?i.jsx(cv,{size:16}):i.jsx(lv,{size:16})})
+          ]}),
+          i.jsxs("div",{className:"mt-3 mb-1 flex items-center gap-2",children:[
+            i.jsx("span",{className:"w-2 h-2 rounded-full bg-[#b4f045]"}),
+            i.jsx("p",{className:"text-xs font-semibold uppercase tracking-wider text-white/60",children:"Saldo disponível para saque"})
+          ]}),
+          i.jsx("div",{className:"text-4xl sm:text-5xl font-black tracking-tight my-2 font-mono",style:{color:showBalance?"#b4f045":"#ffffff"},children:showBalance?Ce(o):"R$ ••••••"}),
+          i.jsxs("div",{className:"mt-5 pt-4 border-t border-white/10 grid grid-cols-3 gap-2 text-center",children:[
+            i.jsxs("div",{className:"bg-white/[0.03] border border-white/[0.06] rounded-2xl p-2.5",children:[
+              i.jsx("p",{className:"text-[10px] uppercase font-bold text-white/40",children:"Liberado"}),
+              i.jsx("p",{className:"text-xs font-bold text-white mt-0.5 truncate",children:Ce(o)})
+            ]}),
+            i.jsxs("div",{className:"bg-white/[0.03] border border-white/[0.06] rounded-2xl p-2.5",children:[
+              i.jsx("p",{className:"text-[10px] uppercase font-bold text-white/40",children:"Parcelas"}),
+              i.jsxs("p",{className:"text-xs font-bold text-white mt-0.5 truncate",children:[instCount,"x ",Ce(instVal)]})
+            ]}),
+            i.jsxs("div",{className:"bg-white/[0.03] border border-white/[0.06] rounded-2xl p-2.5",children:[
+              i.jsx("p",{className:"text-[10px] uppercase font-bold text-[#b4f045]",children:"1ª Parcela"}),
+              i.jsx("p",{className:"text-xs font-bold text-[#b4f045] mt-0.5 truncate",children:dueDate})
+            ]})
+          ]}),
+          i.jsxs("div",{className:"mt-3 rounded-xl px-3 py-2 flex items-center justify-between text-xs",style:{background:"rgba(180, 240, 69, 0.08)",border:"1px solid rgba(180, 240, 69, 0.2)"},children:[
+            i.jsxs("div",{className:"flex items-center gap-2",children:[
+              i.jsx(ov,{size:14,className:"text-[#b4f045]"}),
+              i.jsx("span",{className:"text-white/80 font-medium",children:"Carência de 60 dias para o primeiro vencimento"})
+            ]}),
+            i.jsx("span",{className:"text-[10px] font-black uppercase px-2 py-0.5 rounded-md",style:{backgroundColor:"#b4f045",color:"#0f1712"},children:"Ativa"})
+          ]})
+        ]})
+      ]}),
+      i.jsx("div",{className:"grid grid-cols-4 gap-2.5 mt-5",children:quickActions.map(act=>i.jsxs("button",{key:act.label,onClick:act.onClick,disabled:act.disabled,className:"relative flex flex-col items-center gap-2 py-4 px-2 rounded-2xl border transition-all duration-200 "+(act.primary?"border-[#b4f045]/40 hover:scale-[1.02] shadow-[0_4px_20px_rgba(180,240,69,0.15)]":"border-white/5 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/10"),style:act.primary?{background:"linear-gradient(135deg, rgba(180,240,69,0.15) 0%, rgba(46,85,53,0.2) 100%)"}:undefined,children:[
+        act.badge&&i.jsx("span",{className:"absolute -top-2 left-1/2 -translate-x-1/2 font-black uppercase rounded-full whitespace-nowrap shadow-sm z-10",style:{fontSize:"5.5px",letterSpacing:"-0.3px",lineHeight:"1",padding:"1px 3px",backgroundColor:"#b4f045",color:"#0f1712"},children:act.badge}),
+        i.jsx("div",{className:"w-11 h-11 rounded-2xl flex items-center justify-center transition-transform",style:act.primary?{backgroundColor:"#b4f045",color:"#0f1712"}:{backgroundColor:"rgba(255,255,255,0.08)",color:"#b4f045"},children:i.jsx(act.icon,{size:20})}),
+        i.jsx("span",{className:"text-xs font-semibold text-center leading-tight "+(act.primary?"text-[#b4f045] font-bold":"text-white/80"),children:act.label})
+      ]}))}),
+      hasAmount?i.jsxs("button",{onClick:openWithdrawModal,className:"valore-pulse-glow w-full mt-5 rounded-2xl p-4 flex items-center justify-between font-bold text-base transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]",style:{backgroundColor:"#b4f045",color:"#0f1712",boxShadow:"0 8px 30px rgba(180,240,69,0.35)"},children:[
+        i.jsxs("span",{className:"flex items-center gap-3",children:[
+          i.jsx("div",{className:"w-8 h-8 rounded-xl bg-black/10 flex items-center justify-center",children:i.jsx(_l,{size:18})}),
+          "Transferir meu saldo via PIX"
+        ]}),
+        i.jsx(xm,{size:20})
+      ]}):i.jsxs("div",{className:"w-full mt-5 rounded-2xl bg-white/5 border border-white/10 text-white/70 p-4 flex items-center gap-3 font-medium",children:[
+        i.jsx(ht,{size:20,className:"text-[#b4f045]"}),
+        "Transferência realizada com sucesso via PIX"
+      ]}),
+      i.jsxs("div",{className:"mt-8",children:[
+        i.jsxs("div",{className:"flex items-center justify-between mb-3",children:[
+          i.jsx("h2",{className:"text-sm font-bold uppercase tracking-wider text-white/50",children:"Extrato da Conta"}),
+          i.jsx("span",{className:"text-xs font-semibold text-[#b4f045]",children:"Atualizado agora"})
+        ]}),
+        i.jsxs("div",{className:"space-y-2.5",children:[
+          i.jsxs("button",{type:"button",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};setSelectedReceipt("loan")},className:"w-full text-left flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] hover:border-[#b4f045]/30 rounded-2xl p-4 transition-all hover:bg-white/[0.06] active:scale-[0.99] cursor-pointer group",children:[
+            i.jsx("div",{className:"w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105",style:{backgroundColor:"rgba(180, 240, 69, 0.15)",color:"#b4f045"},children:i.jsx(see,{size:18})}),
+            i.jsxs("div",{className:"flex-1 min-w-0",children:[
+              i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Empréstimo " + Po()}),
+              i.jsx("p",{className:"text-xs text-white/40 mt-1 truncate",children:"Crédito em conta aprovado"})
+            ]}),
+            i.jsxs("div",{className:"text-right shrink-0",children:[
+              i.jsxs("p",{className:"font-black text-sm font-mono tracking-tight",style:{color:"#b4f045"},children:["+",Ce(o)]}),
+              i.jsxs("div",{className:"flex items-center justify-end gap-1 mt-1 text-[11px] text-white/40",children:[
+                i.jsx("span",{className:"font-medium",children:"Hoje"}),
+                i.jsx("span",{className:"text-white/20",children:"•"}),
+                i.jsxs("span",{className:"inline-flex items-center gap-0.5 text-white/45 group-hover:text-[#b4f045] transition-colors font-medium",children:[
+                  "Ver recibo",
+                  i.jsx(fr,{size:11,className:"opacity-60 transition-transform group-hover:translate-x-0.5"})
+                ]})
+              ]})
+            ]})
+          ]}),
+          i.jsxs("button",{type:"button",onClick:()=>{if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(15)}catch(e){};setSelectedReceipt("account")},className:"w-full text-left flex items-center gap-3.5 bg-white/[0.03] border border-white/[0.06] hover:border-white/20 rounded-2xl p-4 transition-all hover:bg-white/[0.06] active:scale-[0.99] cursor-pointer group",children:[
+            i.jsx("div",{className:"w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 text-white/60 transition-transform group-hover:scale-105",children:i.jsx(an,{size:18})}),
+            i.jsxs("div",{className:"flex-1 min-w-0",children:[
+              i.jsx("p",{className:"font-bold text-sm text-white truncate",children:"Abertura de Conta Digital"}),
+              i.jsx("p",{className:"text-xs text-white/40 mt-1 truncate",children:"Tarifa zero e isenção vitalícia"})
+            ]}),
+            i.jsxs("div",{className:"text-right shrink-0",children:[
+              i.jsx("p",{className:"font-black text-sm text-white/70 font-mono tracking-tight",children:"R$ 0,00"}),
+              i.jsxs("div",{className:"flex items-center justify-end gap-1 mt-1 text-[11px] text-white/40",children:[
+                i.jsx("span",{className:"font-medium",children:"Hoje"}),
+                i.jsx("span",{className:"text-white/20",children:"•"}),
+                i.jsxs("span",{className:"inline-flex items-center gap-0.5 text-white/45 group-hover:text-white/80 transition-colors font-medium",children:[
+                  "Ver recibo",
+                  i.jsx(fr,{size:11,className:"opacity-60 transition-transform group-hover:translate-x-0.5"})
+                ]})
+              ]})
+            ]})
+          ]})
+        ]})
+      ]}),
+      i.jsxs("div",{className:"mt-8 rounded-2xl p-4 flex items-center gap-3 bg-white/[0.02] border border-white/[0.05]",children:[
+        i.jsx(Mn,{size:20,className:"text-[#b4f045] shrink-0"}),
+        i.jsxs("div",{className:"text-xs text-white/60 leading-relaxed",children:[
+          "Conta protegida pelo ",
+          i.jsx("strong",{className:"text-white",children:"Fundo Garantidor"}),
+          " e regulamentada sob as normas do Banco Central do Brasil."
+        ]})
       ]})
-    }),
-
-    /* KEEP ALL ORIGINAL MODALS: PIX, CARD, RECEIPT */
+    ]}),
     i.jsxs(Ii,{children:[isModalOpen&&i.jsx(we.div,{className:"fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:()=>modalStep!=="processing"&&setIsModalOpen(!1),children:i.jsxs(we.div,{role:"dialog","aria-modal":"true","aria-label":"Sacar via PIX",className:"bg-[#0f1712] border border-white/10 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl",initial:{y:60,opacity:0},animate:{y:0,opacity:1},exit:{y:60,opacity:0},onClick:ev=>ev.stopPropagation(),children:[
       modalStep==="form"&&i.jsxs("form",{onSubmit:ev=>{ev.preventDefault();handleConfirmWithdraw()},children:[
         i.jsxs("div",{className:"flex items-center justify-between mb-5",children:[
