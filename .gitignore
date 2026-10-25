@@ -6,6 +6,8 @@ npm-debug.log*
 .env
 .env.local
 .env.production
+vercel.env
+*.env
 data/
 *.csv
 tests/*.jsonl

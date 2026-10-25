@@ -216,13 +216,50 @@ function logOrder(event, order, extra = {}) {
       utmify.notifyPixPaid(order, visitor).catch((e) => {
         console.warn('[utmify] falha ao notificar compra aprovada:', e.message);
       });
-      ga4.sendPurchase(order, combinedUser).catch((e) => {
-        console.warn('[ga4-mp] falha ao enviar purchase:', e.message);
-      });
+      // Controle transacional de Idempotência com outbox persistente e trava atômica inter-processo
+      const lockRes = store.acquireGa4Outbox(order.id);
+      if (lockRes.acquired) {
+        ga4.sendPurchase(order, combinedUser).then((res) => {
+          if (res && res.success) {
+            store.releaseGa4Outbox(order.id, {
+              success: true,
+              httpStatus: res.status,
+              // NOTA: HTTP 204 confirma o recebimento no edge do Google Analytics, não validação síncrona
+              transportStatus: 'ACCEPTED_BY_EDGE',
+            });
+            console.log(`[ga4-mp] purchase confirmado e persistido como SENT para ordem ${order.id} (HTTP ${res.status})`);
+          } else {
+            store.releaseGa4Outbox(order.id, {
+              success: false,
+              httpStatus: res?.status,
+              error: res?.error || 'transmission_failed',
+            });
+            console.warn(`[ga4-mp] falha na transmissão de purchase para ordem ${order.id}, mantido em FAILED para retentativa`);
+          }
+        }).catch((e) => {
+          store.releaseGa4Outbox(order.id, {
+            success: false,
+            error: e.message,
+          });
+          console.warn('[ga4-mp] exceção ao enviar purchase:', e.message);
+        });
+      } else {
+        console.log(`[ga4-mp] envio suprimido para ordem ${order.id}: ${lockRes.reason}`);
+      }
     } catch (e) {
       console.warn('[metrics] erro:', e.message);
     }
   }
+}
+
+// Timer de reconciliação de eventos do outbox (retentativas e recuperação de locks abandonados)
+const ga4ReconcileTimer = setInterval(() => {
+  store.reconcileGa4Outbox().catch((e) => {
+    console.warn('[ga4-outbox-reconcile] erro no ciclo de retentativas:', e.message);
+  });
+}, 60000);
+if (ga4ReconcileTimer && typeof ga4ReconcileTimer.unref === 'function') {
+  ga4ReconcileTimer.unref();
 }
 
 const publicOrder = (o) => ({
@@ -521,6 +558,8 @@ async function handleApi(req, res, url) {
 
     const order = store.createOrder({
       visitorId,
+      clientId: body.clientId || null,
+      sessionId: body.sessionId || null,
       items,
       amount,
       totalPrice: amount,
