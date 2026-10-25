@@ -612,6 +612,28 @@ async function handleApi(req, res, url) {
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     return sendJson(req, res, 200, [
       {
+        id: 'bspay',
+        config: {
+          clientId: config.bspay?.clientId ? '••••••••' : '',
+          clientSecret: config.bspay?.clientSecret ? '••••••••' : '',
+        },
+      },
+      {
+        id: 'quantumpay',
+        config: {
+          accountId: config.quantumpay?.accountId || '',
+          apiKey: config.quantumpay?.apiKey ? '••••••••' : '',
+          apiSecret: config.quantumpay?.apiSecret ? '••••••••' : '',
+        },
+      },
+      {
+        id: 'nitropay',
+        config: {
+          publicKey: (config.nitropaySecondary?.publicKey || config.nitropay?.publicKey) ? '••••••••' : '',
+          secretKey: (config.nitropaySecondary?.secretKey || config.nitropay?.secretKey) ? '••••••••' : '',
+        },
+      },
+      {
         id: 'api-cpf',
         config: {
           baseUrl: config.cpf?.base || '',
@@ -624,13 +646,6 @@ async function handleApi(req, res, url) {
           token: config.utmify?.apiToken ? '••••••••' : '',
         },
       },
-      {
-        id: 'payzu',
-        config: {
-          baseUrl: '',
-          token: '',
-        },
-      },
     ]);
   }
 
@@ -638,7 +653,12 @@ async function handleApi(req, res, url) {
   if (integrationMatch && method === 'PUT') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
-    return sendJson(req, res, 200, { ok: true });
+    const integrationId = integrationMatch[1];
+    const body = await readJson(req);
+    const newCfg = body.config || body.data || body;
+    const saved = store.setIntegration(integrationId, newCfg);
+    admin.addAudit('integration_change', `Configurações de ${integrationId} salvas`, ip);
+    return sendJson(req, res, 200, { ok: true, id: integrationId, config: saved });
   }
 
   if (pathname === '/api/cpf-test' && method === 'POST') {
@@ -677,9 +697,15 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/settings') {
     if (method === 'GET') return sendJson(req, res, 200, store.getSettings());
     if (method === 'PUT' || method === 'POST') {
-      if (config.isProd) return fail(req, res, 403, 'Alteração desabilitada em produção');
+      const token = admin.extractToken(req);
+      if (config.isProd && !admin.getSessionByToken(token)) {
+        return fail(req, res, 401, 'Não autorizado');
+      }
       const body = await readJson(req);
-      return sendJson(req, res, 200, store.setSettings({ activeGatewayId: String(body.activeGatewayId || 'quantumpay') }));
+      const data = body.data || body;
+      const updated = store.setSettings(data);
+      admin.addAudit('settings_change', `Gateway ativo alterado para ${data.activeGatewayId || 'padrão'}`, ip);
+      return sendJson(req, res, 200, updated);
     }
   }
 
@@ -687,9 +713,14 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/gateway-fee') {
     if (method === 'GET') return sendJson(req, res, 200, store.getGatewayFee());
     if (method === 'PUT' || method === 'POST') {
-      if (config.isProd) return fail(req, res, 403, 'Alteração desabilitada em produção');
+      const token = admin.extractToken(req);
+      if (config.isProd && !admin.getSessionByToken(token)) {
+        return fail(req, res, 401, 'Não autorizado');
+      }
       const body = await readJson(req);
-      return sendJson(req, res, 200, store.setGatewayFee(body));
+      const data = body.data || body;
+      const updated = store.setGatewayFee(data);
+      return sendJson(req, res, 200, updated);
     }
   }
 
