@@ -43,6 +43,7 @@ const pushService = require('./lib/push');
 const recovery = require('./lib/recovery');
 const pushAdmin = require('./lib/push-admin');
 const utmify = require('./lib/utmify');
+const ga4 = require('./lib/ga4');
 
 let isRunningAutoRecovery = false;
 let lastAutoRecoveryRun = 0;
@@ -214,6 +215,9 @@ function logOrder(event, order, extra = {}) {
       });
       utmify.notifyPixPaid(order, visitor).catch((e) => {
         console.warn('[utmify] falha ao notificar compra aprovada:', e.message);
+      });
+      ga4.sendPurchase(order, combinedUser).catch((e) => {
+        console.warn('[ga4-mp] falha ao enviar purchase:', e.message);
       });
     } catch (e) {
       console.warn('[metrics] erro:', e.message);

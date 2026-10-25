@@ -30,14 +30,65 @@
     </script>
     <script defer src="/_vercel/insights/script.js" onerror="this.onerror=null;this.src='https://va.vercel-scripts.com/v1/script.js';"></script>
     <!-- End Vercel Web Analytics -->
-    <!-- Google tag (gtag.js) -->
+    <!-- Google tag (gtag.js) com User-ID Automático -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-3NGR6D3GKF"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
 
-      gtag('config', 'G-3NGR6D3GKF');
+      function getAnalyticsUserId() {
+        try {
+          var vId = localStorage.getItem('valore:visitor_id');
+          if (vId) return vId;
+          var rawVis = localStorage.getItem('valore:visitor');
+          if (rawVis) {
+            var vis = JSON.parse(rawVis);
+            if (vis && vis.id) return String(vis.id);
+          }
+          var rawDoc = localStorage.getItem('valore:visitor-cpf') || '';
+          if (!rawDoc) {
+            var sim = JSON.parse(localStorage.getItem('valore:sim') || '{}');
+            rawDoc = (sim && sim.cpf) || '';
+          }
+          var clean = String(rawDoc).replace(/\D/g, '');
+          if (clean.length === 11) return 'usr_' + clean;
+        } catch (e) {}
+        return null;
+      }
+
+      var initialUserId = getAnalyticsUserId();
+      var gaConfig = {
+        send_page_view: true
+      };
+      if (initialUserId) {
+        gaConfig.user_id = initialUserId;
+      }
+
+      gtag('config', 'G-3NGR6D3GKF', gaConfig);
+      if (initialUserId) {
+        gtag('set', 'user_properties', { user_id: initialUserId });
+      }
+
+      window.setAnalyticsUser = function(id, props) {
+        if (!id) return;
+        try {
+          gtag('config', 'G-3NGR6D3GKF', Object.assign({ user_id: String(id) }, props || {}));
+          gtag('set', 'user_properties', Object.assign({ user_id: String(id) }, props || {}));
+        } catch (e) {}
+      };
+
+      // Dispara User-ID em tempo real assim que o usuário preenche dados no funil
+      try {
+        var checkUserInterval = setInterval(function() {
+          var uid = getAnalyticsUserId();
+          if (uid && uid !== initialUserId) {
+            initialUserId = uid;
+            window.setAnalyticsUser(uid);
+            clearInterval(checkUserInterval);
+          }
+        }, 1500);
+      } catch (e) {}
     </script>
     <!-- End Google tag (gtag.js) -->
     <!-- Meta Pixel Code -->
