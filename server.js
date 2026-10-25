@@ -614,36 +614,36 @@ async function handleApi(req, res, url) {
       {
         id: 'bspay',
         config: {
-          clientId: config.bspay?.clientId ? '••••••••' : '',
-          clientSecret: config.bspay?.clientSecret ? '••••••••' : '',
+          clientId: config.bspay?.clientId || '',
+          clientSecret: config.bspay?.clientSecret || '',
         },
       },
       {
         id: 'quantumpay',
         config: {
           accountId: config.quantumpay?.accountId || '',
-          apiKey: config.quantumpay?.apiKey ? '••••••••' : '',
-          apiSecret: config.quantumpay?.apiSecret ? '••••••••' : '',
+          apiKey: config.quantumpay?.apiKey || '',
+          apiSecret: config.quantumpay?.apiSecret || '',
         },
       },
       {
         id: 'nitropay',
         config: {
-          publicKey: (config.nitropaySecondary?.publicKey || config.nitropay?.publicKey) ? '••••••••' : '',
-          secretKey: (config.nitropaySecondary?.secretKey || config.nitropay?.secretKey) ? '••••••••' : '',
+          publicKey: (config.nitropaySecondary?.publicKey || config.nitropay?.publicKey) || '',
+          secretKey: (config.nitropaySecondary?.secretKey || config.nitropay?.secretKey) || '',
         },
       },
       {
         id: 'api-cpf',
         config: {
           baseUrl: config.cpf?.base || '',
-          token: config.cpf?.token ? '••••••••' : '',
+          token: config.cpf?.token || '',
         },
       },
       {
         id: 'utmify',
         config: {
-          token: config.utmify?.apiToken ? '••••••••' : '',
+          token: config.utmify?.apiToken || '',
         },
       },
     ]);
@@ -667,12 +667,166 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const rawCpf = String(body.cpf || '').replace(/\D/g, '');
     if (!rawCpf || rawCpf.length !== 11) return fail(req, res, 400, 'CPF inválido');
+    const t0 = Date.now();
     try {
       const person = await cpf.lookup(rawCpf);
-      return sendJson(req, res, 200, { configured: config.cpf.configured, ...person });
+      const elapsedMs = Date.now() - t0;
+      if (!person || !person.nome) {
+        return sendJson(req, res, 200, {
+          configured: config.cpf.configured,
+          ok: false,
+          status: 404,
+          elapsedMs,
+          error: 'CPF não encontrado na base de dados',
+        });
+      }
+      return sendJson(req, res, 200, {
+        configured: config.cpf.configured,
+        ok: true,
+        status: 200,
+        elapsedMs,
+        data: {
+          cpf: person.cpfMasked || person.cpf,
+          name: person.nome,
+          birthDate: person.nascimento,
+          motherName: person.nomeMae,
+        },
+      });
     } catch (err) {
-      return fail(req, res, 500, err.message);
+      return sendJson(req, res, 200, {
+        configured: config.cpf.configured,
+        ok: false,
+        status: err.status || 500,
+        elapsedMs: Date.now() - t0,
+        error: err.message || 'Falha ao consultar CPF na API',
+      });
     }
+  }
+
+  if (pathname === '/api/gateway-test' && method === 'POST') {
+    const t0 = Date.now();
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+
+    const body = await readJson(req);
+    const productId = body.productId || body.data?.productId || 'seguro-plus';
+    const items = products.resolveItems(productId, []);
+    if (!items.length) {
+      return sendJson(req, res, 200, {
+        ok: false,
+        configured: true,
+        elapsedMs: Date.now() - t0,
+        error: 'Produto inválido para cobrança de teste.',
+      });
+    }
+
+    const amount = products.totalOf(items);
+    const chosenGateway = store.getNextGateway();
+
+    const isConfigured = (chosenGateway === 'bspay' && config.bspay.configured) ||
+                         (chosenGateway === 'quantumpay' && config.quantumpay.configured) ||
+                         (chosenGateway === 'nitropay' && config.nitropaySecondary.configured);
+
+    if (!isConfigured) {
+      return sendJson(req, res, 200, {
+        ok: false,
+        configured: false,
+        elapsedMs: Date.now() - t0,
+        error: `O gateway ativo (${chosenGateway}) não possui credenciais válidas configuradas no painel ou nas variáveis de ambiente.`,
+      });
+    }
+
+    const order = store.createOrder({
+      visitorId: null,
+      clientId: null,
+      sessionId: null,
+      items,
+      amount,
+      totalPrice: amount,
+      externalId: makeExternalId(),
+      provider: chosenGateway,
+      channel: 'standard',
+      customer: {
+        name: 'Administrador (Teste)',
+        document: '51095324861',
+        email: 'admin@valorebrasil.app',
+        phone: '11999999999',
+      },
+      ip,
+    });
+    logOrder('created', order, { source: 'gateway-test' });
+
+    let charge = null;
+    try {
+      if (chosenGateway === 'bspay') {
+        charge = await bspay.createPixCharge({
+          amount,
+          externalId: order.externalId,
+          description: `Teste Painel: ${items.map((i) => i.name).join(' + ')}`,
+          postbackUrl: postbackFromRequest(req, 'bspay'),
+          payer: order.customer,
+        });
+      } else if (chosenGateway === 'quantumpay') {
+        charge = await quantumpay.createPixCharge({
+          amount,
+          externalId: order.externalId,
+          description: `Teste Painel: ${items.map((i) => i.name).join(' + ')}`,
+          postbackUrl: postbackFromRequest(req, 'quantumpay'),
+          payer: order.customer,
+        });
+      } else if (chosenGateway === 'nitropay') {
+        charge = await nitropay.createPixCharge({
+          amount,
+          externalId: order.externalId,
+          description: `Teste Painel: ${items.map((i) => i.name).join(' + ')}`,
+          account: 'secondary',
+        });
+      } else {
+        charge = await pix.generateLocalPix({
+          amount,
+          externalId: order.externalId,
+          description: 'Teste Gateway',
+        });
+      }
+    } catch (e) {
+      console.error(`[gateway-test] Falha ao gerar PIX no ${chosenGateway}:`, e.message);
+      return sendJson(req, res, 200, {
+        ok: false,
+        configured: true,
+        status: e.status || 500,
+        elapsedMs: Date.now() - t0,
+        error: `Falha no gateway ${chosenGateway}: ${e.message}`,
+      });
+    }
+
+    const qrText = charge.qrCodeText || charge.pixCopiaECola || charge.emv || '';
+    let qrBase64 = charge.qrCodeBase64 || charge.image || '';
+    if (!qrBase64 && qrText) {
+      qrBase64 = await qrimg.dataUri(qrText);
+    }
+
+    store.attachPixCharge(order.id, {
+      provider: chosenGateway,
+      transactionId: charge.transactionId || charge.id || order.externalId,
+      qrCodeText: qrText,
+      qrCodeBase64: qrBase64,
+      expiresAt: charge.expiresAt || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    });
+
+    return sendJson(req, res, 200, {
+      ok: true,
+      configured: true,
+      elapsedMs: Date.now() - t0,
+      order: {
+        id: order.id,
+        status: 'PENDING',
+        amount: order.amount,
+        totalPrice: order.totalPrice,
+        qrCodeText: qrText,
+        qrCodeBase64: qrBase64,
+        gateway: chosenGateway,
+      },
+    });
   }
 
   if (pathname === '/api/payzu/account' && method === 'GET') {
