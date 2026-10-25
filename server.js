@@ -45,6 +45,7 @@ const pushAdmin = require('./lib/push-admin');
 const utmify = require('./lib/utmify');
 const ga4 = require('./lib/ga4');
 const seo = require('./lib/seo');
+const admin = require('./lib/admin');
 
 let isRunningAutoRecovery = false;
 let lastAutoRecoveryRun = 0;
@@ -329,6 +330,10 @@ async function handleApi(req, res, url) {
   const method = req.method.toUpperCase();
   const ip = clientIp(req);
 
+  if (admin.isIpBlocked(ip) && !pathname.startsWith('/api/webhooks/')) {
+    return fail(req, res, 403, 'Acesso bloqueado');
+  }
+
   if (method === 'OPTIONS') {
     res.writeHead(204, {
       ...baseHeaders(req),
@@ -395,8 +400,9 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/admin/stats') {
     const token = process.env.ADMIN_TOKEN;
     if (config.isProd) {
-      if (!token) return fail(req, res, 404, 'Rota não encontrada');
-      if ((req.headers.authorization || '') !== `Bearer ${token}`) {
+      const auth = req.headers.authorization || '';
+      const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+      if (!admin.getSessionByToken(bearer) && (!token || bearer !== token)) {
         return fail(req, res, 401, 'Não autorizado');
       }
     }
@@ -406,6 +412,265 @@ async function handleApi(req, res, url) {
       quantumpay: { configured: config.quantumpay.configured, base: config.quantumpay.apiBase },
       pix: { provider: config.quantumpay.configured ? 'quantumpay' : (config.bspay.configured ? 'bspay' : 'mock') },
     });
+  }
+
+  /* ------------------------------- admin painel ----------------------------- */
+  if (pathname === '/api/admin/login' && method === 'POST') {
+    const body = await readJson(req);
+    const password = String(body.password || '');
+    const pathKey = body.pathKey;
+
+    if (admin.isIpBlocked(ip)) {
+      admin.addAudit('login_blocked', 'IP bloqueado tentou entrar', ip);
+      return fail(req, res, 403, 'Acesso bloqueado para este IP');
+    }
+
+    if (!admin.verifyPassword(password)) {
+      admin.addAudit('login_fail', 'Senha incorreta', ip);
+      return fail(req, res, 401, 'Senha incorreta');
+    }
+
+    if (!admin.verifyPathKey(pathKey)) {
+      admin.addAudit('login_fail', 'Endereço secreto inválido', ip);
+      return fail(req, res, 401, 'Endereço secreto inválido');
+    }
+
+    const { token } = admin.createSession(req, ip);
+    admin.addAudit('login_ok', 'Login efetuado com sucesso', ip);
+    return sendJson(req, res, 200, { ok: true, token });
+  }
+
+  if (pathname === '/api/admin/session' && method === 'GET') {
+    const token = admin.extractToken(req);
+    const sess = admin.getSessionByToken(token);
+    if (!sess) return fail(req, res, 401, 'Sessão inválida ou expirada');
+    return sendJson(req, res, 200, { ok: true, active: true, user: 'admin', session: { id: sess.id, ip: sess.ip, label: sess.label } });
+  }
+
+  if (pathname === '/api/admin/logout' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (token) {
+      const sess = admin.getSessionByToken(token);
+      if (sess) admin.revokeSession(sess.id);
+      admin.addAudit('logout', 'Saída manual do painel', ip);
+    }
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/admin/security' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, admin.getSecurityStatus());
+  }
+
+  if (pathname === '/api/admin/sessions' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, admin.listSessions(token));
+  }
+
+  if (pathname === '/api/admin/sessions/revoke-all' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const count = admin.revokeAllSessionsExcept(token);
+    admin.addAudit('revoke_all', `Encerrou ${count} outro(s) acesso(s)`, ip);
+    return sendJson(req, res, 200, { ok: true, revoked: count });
+  }
+
+  const revokeMatch = pathname.match(/^\/api\/admin\/sessions\/([\w-]+)$/);
+  if (revokeMatch && method === 'DELETE') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const targetId = revokeMatch[1];
+    admin.revokeSession(targetId);
+    admin.addAudit('revoke_session', `Encerrou acesso ${targetId}`, ip);
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/admin/audit' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const limit = Number(searchParams.get('limit')) || 100;
+    return sendJson(req, res, 200, admin.getAudit(limit));
+  }
+
+  if (pathname === '/api/admin/ip-blocks' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, admin.listIpBlocks());
+  }
+
+  if (pathname === '/api/admin/ip-blocks' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    admin.blockIp(body.ip, body.reason);
+    admin.addAudit('ip_blocked', `IP bloqueado: ${body.ip}`, ip);
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  const unblockMatch = pathname.match(/^\/api\/admin\/ip-blocks\/(.+)$/);
+  if (unblockMatch && method === 'DELETE') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const targetIp = decodeURIComponent(unblockMatch[1]);
+    admin.unblockIp(targetIp);
+    admin.addAudit('ip_unblocked', `IP desbloqueado: ${targetIp}`, ip);
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/admin/password' && method === 'PUT') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    try {
+      const resData = admin.changePassword(body.currentPassword, body.newPassword, token);
+      admin.addAudit('password_change', 'Senha do painel alterada', ip);
+      return sendJson(req, res, 200, resData);
+    } catch (err) {
+      return fail(req, res, 400, err.message);
+    }
+  }
+
+  if (pathname === '/api/admin/path-key' && method === 'PUT') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    try {
+      const resData = admin.changePathKey(body.currentPassword, body.pathKey);
+      admin.addAudit('path_key_change', 'Endereço secreto alterado', ip);
+      return sendJson(req, res, 200, resData);
+    } catch (err) {
+      return fail(req, res, 400, err.message);
+    }
+  }
+
+  if (pathname === '/api/admin/totp/setup' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    try {
+      const resData = admin.setupTotp(body.currentPassword);
+      return sendJson(req, res, 200, resData);
+    } catch (err) {
+      return fail(req, res, 400, err.message);
+    }
+  }
+
+  if (pathname === '/api/admin/totp/confirm' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    const resData = admin.confirmTotp(body.code);
+    admin.addAudit('totp_enable', 'Dois fatores ativado', ip);
+    return sendJson(req, res, 200, resData);
+  }
+
+  if (pathname === '/api/admin/totp/disable' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    try {
+      const resData = admin.disableTotp(body.currentPassword, body.code);
+      admin.addAudit('totp_disable', 'Dois fatores desativado', ip);
+      return sendJson(req, res, 200, resData);
+    } catch (err) {
+      return fail(req, res, 400, err.message);
+    }
+  }
+
+  if (pathname === '/api/dash/summary' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const requestedDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);
+    const s = store.stats();
+    const subs = pushService.getSubscriptions();
+    const execs = (pushService && typeof pushService.getExecutions === 'function') ? pushService.getExecutions() : [];
+    return sendJson(req, res, 200, {
+      day: {
+        registrations: s.visitors || 0,
+        newPushSubs: subs.length,
+        pushSales: s.paid || 0,
+        pushRevenue: s.revenue || 0,
+        notificationsSent: execs.reduce((acc, e) => acc + (e.sent || 0), 0),
+        executions: execs.length,
+        activePushSubs: subs.length,
+      },
+      series: [
+        {
+          date: requestedDate,
+          registrations: s.visitors || 0,
+          pushSubs: subs.length,
+          pushRevenue: s.revenue || 0,
+        },
+      ],
+    });
+  }
+
+  if (pathname === '/api/integrations' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, [
+      {
+        id: 'api-cpf',
+        config: {
+          baseUrl: config.cpf?.base || '',
+          token: config.cpf?.token ? '••••••••' : '',
+        },
+      },
+      {
+        id: 'utmify',
+        config: {
+          token: config.utmify?.apiToken ? '••••••••' : '',
+        },
+      },
+      {
+        id: 'payzu',
+        config: {
+          baseUrl: '',
+          token: '',
+        },
+      },
+    ]);
+  }
+
+  const integrationMatch = pathname.match(/^\/api\/integrations\/([\w-]+)$/);
+  if (integrationMatch && method === 'PUT') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/cpf-test' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    const rawCpf = String(body.cpf || '').replace(/\D/g, '');
+    if (!rawCpf || rawCpf.length !== 11) return fail(req, res, 400, 'CPF inválido');
+    try {
+      const person = await cpf.lookup(rawCpf);
+      return sendJson(req, res, 200, { configured: config.cpf.configured, ...person });
+    } catch (err) {
+      return fail(req, res, 500, err.message);
+    }
+  }
+
+  if (pathname === '/api/payzu/account' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, { ok: false, error: 'Payzu não configurado' });
+  }
+
+  if (pathname === '/api/payzu/contacts' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, { items: [] });
+  }
+
+  if (pathname === '/api/payzu/withdrawals' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, { items: [] });
   }
 
   /* --------------------------------- settings ------------------------------- */
@@ -477,6 +742,26 @@ async function handleApi(req, res, url) {
   }
 
   /* -------------------------------- visitantes ------------------------------ */
+  if (pathname === '/api/visitors' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    let all = store.listVisitors();
+    const q = (searchParams.get('q') || '').toLowerCase().trim();
+    const status = searchParams.get('status');
+    const limit = Number(searchParams.get('limit')) || 20;
+    const offset = Number(searchParams.get('offset')) || 0;
+
+    if (q) {
+      all = all.filter((v) => (v.name && v.name.toLowerCase().includes(q)) || (v.cpf && v.cpf.includes(q)) || (v.phone && v.phone.includes(q)) || (v.email && v.email.toLowerCase().includes(q)));
+    }
+    if (status && status !== 'todos') {
+      all = all.filter((v) => v.stage === status || v.status === status);
+    }
+    const items = all.slice(offset, offset + limit);
+    const hasMore = offset + limit < all.length;
+    return sendJson(req, res, 200, { items, total: all.length, hasMore });
+  }
+
   if (pathname === '/api/visitors' && method === 'POST') {
     const body = await readJson(req);
     const utm = Object.fromEntries([...searchParams].filter(([k]) => k.startsWith('utm_') || k === 'src' || k === 'sck'));
