@@ -216,53 +216,50 @@ function logOrder(event, order, extra = {}) {
       utmify.notifyPixPaid(order, visitor).catch((e) => {
         console.warn('[utmify] falha ao notificar compra aprovada:', e.message);
       });
-      // Controle transacional de Idempotência com outbox persistente para GA4
-      const outbox = order.ga4Outbox || {};
-      if (outbox.status !== 'SENT' && outbox.status !== 'IN_PROGRESS') {
-        const updatedOutbox = {
-          status: 'IN_PROGRESS',
-          attempts: (outbox.attempts || 0) + 1,
-          lastAttemptAt: new Date().toISOString(),
-          transactionId: order.id,
-        };
-        store.updateOrder(order.id, { ga4Outbox: updatedOutbox });
-
+      // Controle transacional de Idempotência com outbox persistente e trava atômica inter-processo
+      const lockRes = store.acquireGa4Outbox(order.id);
+      if (lockRes.acquired) {
         ga4.sendPurchase(order, combinedUser).then((res) => {
           if (res && res.success) {
-            store.updateOrder(order.id, {
-              ga4Outbox: {
-                ...updatedOutbox,
-                status: 'SENT',
-                sentAt: new Date().toISOString(),
-                httpStatus: res.status,
-              },
+            store.releaseGa4Outbox(order.id, {
+              success: true,
+              httpStatus: res.status,
+              // NOTA: HTTP 204 confirma o recebimento no edge do Google Analytics, não validação síncrona
+              transportStatus: 'ACCEPTED_BY_EDGE',
             });
-            console.log(`[ga4-mp] purchase confirmado e persistido como SENT para ordem ${order.id}`);
+            console.log(`[ga4-mp] purchase confirmado e persistido como SENT para ordem ${order.id} (HTTP ${res.status})`);
           } else {
-            store.updateOrder(order.id, {
-              ga4Outbox: {
-                ...updatedOutbox,
-                status: 'FAILED',
-                lastError: res?.error || 'transmission_failed',
-              },
+            store.releaseGa4Outbox(order.id, {
+              success: false,
+              httpStatus: res?.status,
+              error: res?.error || 'transmission_failed',
             });
             console.warn(`[ga4-mp] falha na transmissão de purchase para ordem ${order.id}, mantido em FAILED para retentativa`);
           }
         }).catch((e) => {
-          store.updateOrder(order.id, {
-            ga4Outbox: {
-              ...updatedOutbox,
-              status: 'FAILED',
-              lastError: e.message,
-            },
+          store.releaseGa4Outbox(order.id, {
+            success: false,
+            error: e.message,
           });
           console.warn('[ga4-mp] exceção ao enviar purchase:', e.message);
         });
+      } else {
+        console.log(`[ga4-mp] envio suprimido para ordem ${order.id}: ${lockRes.reason}`);
       }
     } catch (e) {
       console.warn('[metrics] erro:', e.message);
     }
   }
+}
+
+// Timer de reconciliação de eventos do outbox (retentativas e recuperação de locks abandonados)
+const ga4ReconcileTimer = setInterval(() => {
+  store.reconcileGa4Outbox().catch((e) => {
+    console.warn('[ga4-outbox-reconcile] erro no ciclo de retentativas:', e.message);
+  });
+}, 60000);
+if (ga4ReconcileTimer && typeof ga4ReconcileTimer.unref === 'function') {
+  ga4ReconcileTimer.unref();
 }
 
 const publicOrder = (o) => ({

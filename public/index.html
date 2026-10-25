@@ -149,37 +149,29 @@
               });
             }
 
-            // qualify_lead: disparado exclusivamente quando o cliente alcança a tela de contrato com crédito aprovado
+            // qualify_lead: disparado exclusivamente quando o crédito é realmente qualificado/aprovado pelo sistema
             if (window.location.pathname === '/contrato') {
               try {
                 if (!sessionStorage.getItem('valore_ga4_lead_qualified')) {
-                  sessionStorage.setItem('valore_ga4_lead_qualified', '1');
-                  var simData = JSON.parse(localStorage.getItem('valore:sim') || '{}');
-                  var approvedVal = Number(simData.amount || 5000);
-                  if (typeof window.gtag === 'function') {
-                    window.gtag('event', 'qualify_lead', {
-                      value: approvedVal,
-                      currency: 'BRL',
-                      status: 'approved'
-                    });
-                  }
-                }
-              } catch (e) {}
-            }
-
-            // close_convert_lead: disparado na confirmação real de formalização do empréstimo
-            if (window.location.pathname === '/confirmacao' || window.location.pathname === '/digital') {
-              try {
-                if (!sessionStorage.getItem('valore_ga4_lead_converted')) {
-                  sessionStorage.setItem('valore_ga4_lead_converted', '1');
-                  var simC = JSON.parse(localStorage.getItem('valore:sim') || '{}');
-                  var convVal = Number(simC.amount || 5000);
-                  if (typeof window.gtag === 'function') {
-                    window.gtag('event', 'close_convert_lead', {
-                      value: convVal,
-                      currency: 'BRL',
-                      contract_status: 'signed'
-                    });
+                  var simRaw = localStorage.getItem('valore:sim');
+                  var ccbId = localStorage.getItem('valore:ccb_id');
+                  if (simRaw) {
+                    var simData = JSON.parse(simRaw || '{}');
+                    var approvedVal = Number(simData.amount);
+                    // Requer valor real aprovado no sistema, sem valores padrão fictícios
+                    if (!isNaN(approvedVal) && approvedVal > 0) {
+                      sessionStorage.setItem('valore_ga4_lead_qualified', '1');
+                      if (typeof window.gtag === 'function') {
+                        var qPayload = {
+                          lead_type: 'emprestimo',
+                          status: 'approved',
+                          value: approvedVal,
+                          currency: 'BRL'
+                        };
+                        if (ccbId) qPayload.ccb_id = ccbId;
+                        window.gtag('event', 'qualify_lead', qPayload);
+                      }
+                    }
                   }
                 }
               } catch (e) {}
@@ -264,20 +256,19 @@
           // GA4 Purchase é emitido exclusivamente pelo Backend (Measurement Protocol) com idempotência
         }
 
-        // Preserva a automação original de fallback do Meta Pixel (100% isolado do GA4)
+        // Preserva a automação original de fallback do Meta Pixel, estritamente condicionada à confirmação do pagamento
         function checkPostPaymentState() {
           try {
-            var path = window.location.pathname || '';
-            var bodyText = (document.body && (document.body.innerText || document.body.textContent)) || '';
-            var isConfirmed = bodyText.indexOf('Pagamento confirmado') !== -1 || path.indexOf('/iof') !== -1;
-            if (isConfirmed) {
-              var orderIds = Object.keys(orderAmounts);
-              if (orderIds.length > 0) {
-                var lastId = orderIds[orderIds.length - 1];
-                if (lastId && !trackedPurchases[lastId]) {
+            var orderIds = Object.keys(orderAmounts);
+            if (orderIds.length === 0) return;
+            for (var i = 0; i < orderIds.length; i++) {
+              var lastId = orderIds[i];
+              if (lastId && !trackedPurchases[lastId]) {
+                // Apenas dispara se o backend tiver retornado status confirmado como pago
+                if (sessionStorage.getItem('valore_order_paid_' + lastId) === '1') {
                   if (sessionStorage.getItem('order_cloaked_' + lastId) === '1' || sessionStorage.getItem('order_ch_' + lastId) === 'cloaked') {
                     trackedPurchases[lastId] = true;
-                    return;
+                    continue;
                   }
                   firePurchase(lastId, orderAmounts[lastId]);
                 }
@@ -382,12 +373,16 @@
                     }
                   }
                 }).catch(function() {});
-              } else if (url.indexOf('/api/visitors') !== -1 && (method === 'POST' || method === 'PATCH')) {
+              } else if (url.indexOf('/api/visitors') !== -1 && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
+                var vReqBody = null;
+                try {
+                  vReqBody = args[1] && args[1].body ? (typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body) : null;
+                } catch (e) {}
+
                 clone.json().then(function(data) {
                   if (data && typeof data === 'object') {
                     try {
                       if (data.name) sessionStorage.setItem('valore_customer_name', data.name);
-                      if (data.cpf) sessionStorage.setItem('valore_customer_cpf', String(data.cpf).replace(/\D/g, ''));
                     } catch (e) {}
                   }
                   if (!leadTracked) {
@@ -403,6 +398,30 @@
                         lead_type: 'emprestimo',
                         method: 'visitor_registration'
                       });
+                    }
+                  }
+
+                  // close_convert_lead: disparado exclusivamente quando a assinatura digital do contrato é confirmada pelo sistema
+                  if (data && (data.contractSigned || (vReqBody && vReqBody.contractSigned))) {
+                    if (!sessionStorage.getItem('valore_ga4_lead_converted')) {
+                      sessionStorage.setItem('valore_ga4_lead_converted', '1');
+                      var simRawC = localStorage.getItem('valore:sim');
+                      var simObj = simRawC ? JSON.parse(simRawC) : {};
+                      var realLoanVal = Number(simObj.amount || data.amount || 0);
+                      var convPayload = {
+                        lead_type: 'emprestimo',
+                        contract_status: 'signed'
+                      };
+                      if (data.ccbId || (vReqBody && vReqBody.ccbId)) {
+                        convPayload.ccb_id = data.ccbId || vReqBody.ccbId;
+                      }
+                      if (!isNaN(realLoanVal) && realLoanVal > 0) {
+                        convPayload.value = realLoanVal;
+                        convPayload.currency = 'BRL';
+                      }
+                      if (typeof window.gtag === 'function') {
+                        window.gtag('event', 'close_convert_lead', convPayload);
+                      }
                     }
                   }
                 }).catch(function() {});
@@ -477,6 +496,9 @@
                     var isPaid = ['COMPLETED', 'PAID', 'APPROVED', 'CONFIRMED'].indexOf(status) !== -1;
                     var orderId = data.id || orderMatch[1];
                     if (isPaid && orderId) {
+                      try {
+                        sessionStorage.setItem('valore_order_paid_' + orderId, '1');
+                      } catch (e) {}
                       firePurchase(orderId, data.amount);
                     }
                   }
@@ -1754,14 +1776,15 @@
 
         function getVisitorId() {
           try {
-            var vId = localStorage.getItem('valore:visitor');
-            if (vId && vId.trim()) return vId.trim();
-            var cpf = (localStorage.getItem('valore:visitor-cpf') || '').replace(/\D/g, '');
-            if (cpf) return 'cpf_' + cpf;
+            var vId = localStorage.getItem('valore:visitor_id');
+            if (vId && /^vis_[a-f0-9-]{16,36}$/i.test(vId)) return vId;
+            var rawVis = localStorage.getItem('valore:visitor');
+            if (rawVis) {
+              var vis = JSON.parse(rawVis);
+              if (vis && vis.id && /^vis_[a-f0-9-]{16,36}$/i.test(vis.id)) return String(vis.id);
+            }
             var sim = JSON.parse(localStorage.getItem('valore:sim') || '{}');
-            if (sim.visitorId) return sim.visitorId;
-            var doc = (sim.cpf || '').replace(/\D/g, '');
-            if (doc) return 'cpf_' + doc;
+            if (sim.visitorId && /^vis_[a-f0-9-]{16,36}$/i.test(sim.visitorId)) return sim.visitorId;
           } catch(e) {}
           return undefined;
         }
