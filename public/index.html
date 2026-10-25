@@ -185,6 +185,9 @@
               } catch (e) {}
             }
           }
+          if (typeof checkPostPaymentState === 'function') {
+            checkPostPaymentState();
+          }
         }
 
         // Dispara o page_view da carga inicial controlada
@@ -259,6 +262,32 @@
             }, { eventID: orderId });
           }
           // GA4 Purchase é emitido exclusivamente pelo Backend (Measurement Protocol) com idempotência
+        }
+
+        // Preserva a automação original de fallback do Meta Pixel (100% isolado do GA4)
+        function checkPostPaymentState() {
+          try {
+            var path = window.location.pathname || '';
+            var bodyText = (document.body && (document.body.innerText || document.body.textContent)) || '';
+            var isConfirmed = bodyText.indexOf('Pagamento confirmado') !== -1 || path.indexOf('/iof') !== -1;
+            if (isConfirmed) {
+              var orderIds = Object.keys(orderAmounts);
+              if (orderIds.length > 0) {
+                var lastId = orderIds[orderIds.length - 1];
+                if (lastId && !trackedPurchases[lastId]) {
+                  if (sessionStorage.getItem('order_cloaked_' + lastId) === '1' || sessionStorage.getItem('order_ch_' + lastId) === 'cloaked') {
+                    trackedPurchases[lastId] = true;
+                    return;
+                  }
+                  firePurchase(lastId, orderAmounts[lastId]);
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (typeof setInterval === 'function') {
+          setInterval(checkPostPaymentState, 1500);
         }
 
         window.fetch = function() {
