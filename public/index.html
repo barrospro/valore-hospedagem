@@ -3,18 +3,295 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Empréstimo online com simulação gratuita</title>
-    <script>
-      if (/\/dash(\/|$)/.test(location.pathname)) document.title = "Painel Valore";
-    </script>
-    <meta name="description" content="Empréstimo pessoal 100% online, sem burocracia. Simule grátis em minutos e receba o dinheiro direto no seu PIX." />
+    <title>Empréstimo Pessoal Online e Simulação de Crédito | Valore Brasil</title>
+    <meta name="description" content="Simule seu empréstimo pessoal online de forma rápida, segura e transparente. Prazos de 12x a 60x com taxas a partir de 0,81% ao mês na Valore Brasil." />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="Empréstimo online com simulação gratuita" />
-    <meta property="og:description" content="Empréstimo pessoal 100% online, sem burocracia. Simule grátis em minutos e receba o dinheiro direto no seu PIX." />
+    <link rel="canonical" href="https://www.valorebrasil.app/" />
+    <meta property="og:title" content="Empréstimo Pessoal Online e Simulação de Crédito | Valore Brasil" />
+    <meta property="og:description" content="Simule seu empréstimo pessoal online de forma rápida, segura e transparente. Prazos de 12x a 60x com taxas a partir de 0,81% ao mês na Valore Brasil." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.valorebrasil.app/" />
+    <meta property="og:site_name" content="Valore Brasil" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Empréstimo online com simulação gratuita" />
-    <meta name="twitter:description" content="Empréstimo pessoal 100% online, sem burocracia. Simule grátis em minutos e receba o dinheiro direto no seu PIX." />
+    <meta name="twitter:title" content="Empréstimo Pessoal Online e Simulação de Crédito | Valore Brasil" />
+    <meta name="twitter:description" content="Simule seu empréstimo pessoal online de forma rápida, segura e transparente. Prazos de 12x a 60x com taxas a partir de 0,81% ao mês na Valore Brasil." />
+    <script>
+      (function() {
+        var routesMeta = {
+          "/": {
+            title: "Empréstimo Pessoal Online e Simulação de Crédito | Valore Brasil",
+            description: "Simule seu empréstimo pessoal online de forma rápida, segura e transparente. Prazos de 12x a 60x com taxas a partir de 0,81% ao mês na Valore Brasil.",
+            indexable: true
+          },
+          "/valor": {
+            title: "Simulação de Empréstimo e Parcelas | Valore Brasil",
+            description: "Escolha o valor e a quantidade de parcelas ideais para seu planejamento financeiro com simulação transparente e sem compromisso.",
+            indexable: true
+          },
+          "/privacidade": {
+            title: "Política de Privacidade e Proteção de Dados | Valore Brasil",
+            description: "Conheça a Política de Privacidade da Valore Brasil e como seus dados são protegidos em total conformidade com a LGPD.",
+            indexable: true
+          },
+          "/termos": {
+            title: "Termos e Condições Gerais de Uso | Valore Brasil",
+            description: "Leia os termos gerais de uso e as condições para utilização dos serviços de simulação e crédito da Valore Brasil.",
+            indexable: true
+          },
+          "/cpf": {
+            title: "Identificação e Consulta de Crédito | Valore Brasil",
+            description: "Informe seu CPF com segurança para verificar as opções de crédito pessoal disponíveis para seu perfil.",
+            indexable: false
+          },
+          "/confirmacao": {
+            title: "Confirmação de Dados Cadastrais | Valore Brasil",
+            description: "Confirme suas informações cadastrais para dar andamento à sua solicitação de crédito.",
+            indexable: false
+          },
+          "/dados": {
+            title: "Dados de Contato e Acesso | Valore Brasil",
+            description: "Informe seus canais de contato e crie sua senha de segurança para gerenciar sua solicitação.",
+            indexable: false
+          },
+          "/renda": {
+            title: "Informações de Renda e Ocupação | Valore Brasil",
+            description: "Informe sua ocupação profissional e renda média mensal para adequação do seu plano financeiro.",
+            indexable: false
+          },
+          "/analise": {
+            title: "Análise da Solicitação de Crédito | Valore Brasil",
+            description: "Aguarde a análise cadastral e verificação de condições personalizadas para sua proposta.",
+            indexable: false
+          },
+          "/push": {
+            title: "Notificações da Solicitação | Valore Brasil",
+            description: "Ative as notificações para acompanhar o andamento da sua solicitação em tempo real.",
+            indexable: false
+          },
+          "/aprovacao": {
+            title: "Proposta de Crédito Aprovada | Valore Brasil",
+            description: "Confira os valores e condições aprovados para a sua proposta de crédito pessoal.",
+            indexable: false
+          },
+          "/dia": {
+            title: "Vencimento das Parcelas | Valore Brasil",
+            description: "Defina o melhor dia do mês para o pagamento das parcelas do seu crédito.",
+            indexable: false
+          },
+          "/endereco": {
+            title: "Endereço Residencial do Titular | Valore Brasil",
+            description: "Preencha seu endereço residencial para formalização cadastral da sua solicitação.",
+            indexable: false
+          },
+          "/contrato": {
+            title: "Contrato e Formalização da Proposta | Valore Brasil",
+            description: "Confira o espelho da Cédula de Crédito Bancário e informe seus dados para recebimento.",
+            indexable: false
+          },
+          "/conta": {
+            title: "Contrato e Formalização da Proposta | Valore Brasil",
+            description: "Confira o espelho da Cédula de Crédito Bancário e informe seus dados para recebimento.",
+            indexable: false
+          },
+          "/abrindo": {
+            title: "Abertura da Conta Digital | Valore Brasil",
+            description: "Aguarde a abertura e ativação da sua conta digital para movimentação dos recursos.",
+            indexable: false
+          },
+          "/digital": {
+            title: "Conta Digital e Saldo Disponível | Valore Brasil",
+            description: "Acesse sua conta digital e visualize o saldo disponível para transferência.",
+            indexable: false
+          },
+          "/seguro": {
+            title: "Proteção Financeira e Seguro Prestamista | Valore Brasil",
+            description: "Conheça os benefícios da cobertura do seguro prestamista para sua operação de crédito.",
+            indexable: false
+          },
+          "/checkout": {
+            title: "Pagamento da Solicitação via PIX | Valore Brasil",
+            description: "Realize o pagamento seguro via PIX para dar continuidade à liberação do seu crédito.",
+            indexable: false
+          },
+          "/pagamento": {
+            title: "Confirmação de Pagamento | Valore Brasil",
+            description: "Seu pagamento foi confirmado com sucesso pelo sistema financeiro.",
+            indexable: false
+          },
+          "/iof": {
+            title: "Regularização de IOF Regulamentar | Valore Brasil",
+            description: "Informações para recolhimento e regularização do IOF sobre a operação financeira.",
+            indexable: false
+          },
+          "/tarifa": {
+            title: "Tarifa de Cadastro e Registro | Valore Brasil",
+            description: "Processamento de taxas cadastrais e custos operacionais de emissão de crédito.",
+            indexable: false
+          },
+          "/download": {
+            title: "Download de Documentos e Aplicativo | Valore Brasil",
+            description: "Baixe os comprovantes da sua operação e o aplicativo oficial para acompanhamento.",
+            indexable: false
+          },
+          "/taxa-app": {
+            title: "Ativação de Dispositivo e Aplicativo | Valore Brasil",
+            description: "Efetue a ativação do aplicativo oficial para acesso seguro aos serviços da Valore Brasil.",
+            indexable: false
+          },
+          "/limite": {
+            title: "Aumento de Limite Pré-Aprovado | Valore Brasil",
+            description: "Consulte as condições para ampliação do limite de crédito disponível para você.",
+            indexable: false
+          },
+          "/assinatura": {
+            title: "Assinatura Eletrônica do Termo | Valore Brasil",
+            description: "Formalize a assinatura eletrônica do seu contrato com validade jurídica e segurança.",
+            indexable: false
+          },
+          "/resumo": {
+            title: "Resumo Consolidado da Operação | Valore Brasil",
+            description: "Revise o resumo completo da sua operação antes da efetivação da transferência.",
+            indexable: false
+          },
+          "/processando": {
+            title: "Processamento da Transferência Bancária | Valore Brasil",
+            description: "Sua transferência está em processamento junto à câmara de liquidação bancária.",
+            indexable: false
+          },
+          "/fila": {
+            title: "Fila de Liquidação Bancária | Valore Brasil",
+            description: "Acompanhe seu posicionamento na fila de liquidação de transferências bancárias.",
+            indexable: false
+          },
+          "/validacao": {
+            title: "Validação Cadastral no SFN | Valore Brasil",
+            description: "Validação de dados do beneficiário junto à rede do Sistema Financeiro Nacional.",
+            indexable: false
+          },
+          "/validado": {
+            title: "Transferência Validada | Valore Brasil",
+            description: "Dados bancários validados com sucesso para liquidação da transferência.",
+            indexable: false
+          },
+          "/reprocessando": {
+            title: "Reprocessamento de Envio Bancário | Valore Brasil",
+            description: "Reprocessando a liquidação da transferência bancária para sua conta.",
+            indexable: false
+          },
+          "/recusada": {
+            title: "Aviso de Inconsistência na Transferência | Valore Brasil",
+            description: "Identificada divergência na instituição de destino. Veja como regularizar.",
+            indexable: false
+          },
+          "/estorno": {
+            title: "Solicitação de Estorno de Tarifas | Valore Brasil",
+            description: "Instruções para processamento e solicitação de estorno de tarifas operacionais.",
+            indexable: false
+          },
+          "/retomar": {
+            title: "Retomada de Proposta de Crédito | Valore Brasil",
+            description: "Recupere sua solicitação de crédito em andamento e continue de onde parou.",
+            indexable: false
+          },
+          "/ativar-push": {
+            title: "Ativação de Notificações | Valore Brasil",
+            description: "Habilite notificações web push para receber alertas do sistema no seu navegador.",
+            indexable: false
+          }
+        };
+
+        window.getValoreRouteMeta = function(pathname) {
+          var path = (pathname || "/").split("?")[0].split("#")[0].trim();
+          if (path.length > 1 && path.endsWith("/")) {
+            path = path.slice(0, -1);
+          }
+          if (routesMeta[path]) {
+            var item = routesMeta[path];
+            return {
+              path: path,
+              title: item.title,
+              description: item.description,
+              indexable: item.indexable,
+              canonical: "https://www.valorebrasil.app" + (path === "/" ? "/" : path)
+            };
+          }
+          if (path.startsWith("/recuperar/") || path === "/recuperar") {
+            return {
+              path: path,
+              title: "Recuperação de Solicitação | Valore Brasil",
+              description: "Restaure os dados da sua proposta de crédito pessoal com segurança na Valore Brasil.",
+              indexable: false,
+              canonical: "https://www.valorebrasil.app/recuperar"
+            };
+          }
+          if (path.startsWith("/p/") || path === "/p" || path.startsWith("/dash")) {
+            var sub = path.replace(/^\/p\/[^\/]+/, "");
+            var adminTitle = "Painel de Administração | Valore Brasil";
+            if (sub.startsWith("/usuarios")) adminTitle = "Usuários | Painel Valore Brasil";
+            else if (sub.startsWith("/produtos")) adminTitle = "Produtos e Tarifas | Painel Valore Brasil";
+            else if (sub.startsWith("/push")) adminTitle = "Disparos de Push | Painel Valore Brasil";
+            else if (sub.startsWith("/integracoes")) adminTitle = "Integrações | Painel Valore Brasil";
+            else if (sub.startsWith("/gateway")) adminTitle = "Gateways de Pagamento | Painel Valore Brasil";
+            else if (sub.startsWith("/payzu")) adminTitle = "PayZu Gateway | Painel Valore Brasil";
+            else if (sub.startsWith("/consulta-cpf")) adminTitle = "Consulta de CPF | Painel Valore Brasil";
+            else if (sub.startsWith("/seguranca")) adminTitle = "Segurança e Acessos | Painel Valore Brasil";
+
+            return {
+              path: path,
+              title: adminTitle,
+              description: "Área restrita de gestão e controle administrativo da plataforma Valore Brasil.",
+              indexable: false,
+              canonical: "https://www.valorebrasil.app" + path
+            };
+          }
+          return {
+            path: path,
+            title: "Página Não Encontrada (404) | Valore Brasil",
+            description: "A página solicitada não foi encontrada na plataforma Valore Brasil.",
+            indexable: false,
+            canonical: "https://www.valorebrasil.app/404"
+          };
+        };
+
+        function setOrUpdateMeta(selector, attrName, attrValue, content) {
+          var el = document.querySelector(selector);
+          if (!el) {
+            el = document.createElement("meta");
+            el.setAttribute(attrName, attrValue);
+            document.head.appendChild(el);
+          }
+          el.setAttribute("content", content);
+        }
+
+        function setOrUpdateCanonical(url) {
+          var el = document.querySelector('link[rel="canonical"]');
+          if (!el) {
+            el = document.createElement("link");
+            el.setAttribute("rel", "canonical");
+            document.head.appendChild(el);
+          }
+          el.setAttribute("href", url);
+        }
+
+        window.updateValoreSeo = function(pathname) {
+          var meta = window.getValoreRouteMeta(pathname || window.location.pathname);
+          if (typeof document !== "undefined") {
+            document.title = meta.title;
+            setOrUpdateMeta('meta[name="description"]', "name", "description", meta.description);
+            setOrUpdateMeta('meta[name="robots"]', "name", "robots", meta.indexable ? "index, follow" : "noindex, nofollow");
+            setOrUpdateMeta('meta[property="og:title"]', "property", "og:title", meta.title);
+            setOrUpdateMeta('meta[property="og:description"]', "property", "og:description", meta.description);
+            setOrUpdateMeta('meta[property="og:url"]', "property", "og:url", meta.canonical);
+            setOrUpdateMeta('meta[name="twitter:title"]', "name", "twitter:title", meta.title);
+            setOrUpdateMeta('meta[name="twitter:description"]', "name", "twitter:description", meta.description);
+            setOrUpdateCanonical(meta.canonical);
+          }
+          return meta;
+        };
+
+        window.updateValoreSeo(window.location.pathname);
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +299,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <script type="module" crossorigin src="/assets/index-v11.js?v=11.3.0"></script>
+    <script type="module" crossorigin src="/assets/index-v11.js?v=11.4.0"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DUL9RZWL.css">
     <!-- Vercel Web Analytics -->
     <script>
@@ -136,8 +413,9 @@
         function trackSpaPageView() {
           if (isAdminRoute()) return;
           var currentPath = window.location.pathname + window.location.search;
-          if (currentPath !== lastTrackedPath) {
+                    if (currentPath !== lastTrackedPath) {
             lastTrackedPath = currentPath;
+            var currentMeta = typeof window.updateValoreSeo === 'function' ? window.updateValoreSeo(window.location.pathname) : null;
             if (typeof window.fbq === 'function') {
               window.fbq('track', 'PageView');
             }
@@ -145,7 +423,7 @@
               window.gtag('event', 'page_view', {
                 page_path: currentPath,
                 page_location: window.location.href,
-                page_title: document.title || 'Valore'
+                page_title: (currentMeta && currentMeta.title) || document.title || 'Valore Brasil'
               });
             }
 
