@@ -24,3 +24,4 @@ Thumbs.db
 scratch/
 *.bak*
 docs/extract_*.txt
+.env*
