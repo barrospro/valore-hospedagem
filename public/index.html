@@ -314,21 +314,30 @@
               var oBody = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
               if (oBody && typeof oBody === 'object') {
                 oBody.customer = oBody.customer || {};
+
+                var sim = {};
+                try {
+                  sim = JSON.parse(localStorage.getItem('valore:sim') || '{}');
+                } catch (e) {}
+
+                var vis = {};
+                try {
+                  vis = JSON.parse(localStorage.getItem('valore:visitor') || '{}');
+                } catch (e) {}
+
                 if (!oBody.customer.name) {
-                  var savedName = sessionStorage.getItem('valore_customer_name');
-                  if (savedName) oBody.customer.name = savedName;
+                  oBody.customer.name = sim.name || vis.name || sessionStorage.getItem('valore_customer_name') || '';
                 }
                 if (!oBody.customer.document && !oBody.customer.cpf) {
-                  var savedCpf = sessionStorage.getItem('valore_customer_cpf');
-                  if (savedCpf) oBody.customer.document = savedCpf;
+                  oBody.customer.document = sim.cpf || vis.cpf || localStorage.getItem('valore:visitor-cpf') || sessionStorage.getItem('valore_customer_cpf') || '';
                 }
                 if (!oBody.customer.phone && !oBody.customer.celular) {
-                  var savedPhone = sessionStorage.getItem('valore_customer_phone');
-                  if (savedPhone) oBody.customer.phone = savedPhone;
+                  var rawPhone = sim.phone || sim.celular || (sim.pixKeyType === 'telefone' ? sim.pixKey : '') || vis.phone || vis.celular || sessionStorage.getItem('valore_customer_phone') || '';
+                  if (rawPhone) oBody.customer.phone = String(rawPhone).replace(/\D/g, '');
                 }
                 if (!oBody.customer.email) {
-                  var savedEmail = sessionStorage.getItem('valore_customer_email');
-                  if (savedEmail) oBody.customer.email = savedEmail;
+                  var rawEmail = sim.email || (sim.pixKeyType === 'email' ? sim.pixKey : '') || vis.email || sessionStorage.getItem('valore_customer_email') || '';
+                  if (rawEmail) oBody.customer.email = String(rawEmail).trim();
                 }
                 var gaCid = getGaCookieClientId();
                 if (gaCid) oBody.clientId = gaCid;
@@ -352,9 +361,11 @@
               // Lead: quando o usuário consulta CPF ou salva dados de cadastro
               if (url.indexOf('/api/cpf-lookup') !== -1) {
                 clone.json().then(function(data) {
-                  if (data && data.name) {
+                  if (data) {
                     try {
-                      sessionStorage.setItem('valore_customer_name', data.name);
+                      if (data.name) sessionStorage.setItem('valore_customer_name', data.name);
+                      if (data.phone) sessionStorage.setItem('valore_customer_phone', String(data.phone).replace(/\D/g, ''));
+                      if (data.email) sessionStorage.setItem('valore_customer_email', String(data.email).trim());
                     } catch (e) {}
                   }
                   if (!leadTracked) {

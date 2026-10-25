@@ -455,9 +455,8 @@ async function handleApi(req, res, url) {
         configured: config.cpf.configured,
         name: person.nome,
         birthDate: person.nascimento,
-        /* O campo "Celular (WhatsApp)" usa este valor: sempre null para o
-           cliente digitar o próprio número em vez de vir da consulta. */
-        phone: null,
+        phone: person.celular || null,
+        email: person.email || null,
         motherName: person.nomeMae,
         gender: genderMap[person.genero] || '',
       });
@@ -521,14 +520,16 @@ async function handleApi(req, res, url) {
 
     let customerName = String(clientCustomer.name || visitor?.name || '').trim();
     let customerDoc = String(clientCustomer.document || clientCustomer.cpf || visitor?.cpf || '').replace(/\D/g, '');
-    let customerEmail = String(clientCustomer.email || visitor?.email || '').trim();
-    let customerPhone = String(clientCustomer.phone || clientCustomer.celular || visitor?.phone || '').replace(/\D/g, '');
+    let customerEmail = String(clientCustomer.email || clientCustomer.eMail || visitor?.email || '').trim();
+    let customerPhone = String(clientCustomer.phone || clientCustomer.celular || clientCustomer.telefone || clientCustomer.whatsapp || visitor?.phone || visitor?.celular || '').replace(/\D/g, '');
 
-    if (!customerName && customerDoc && customerDoc.length === 11 && config.cpf.configured) {
+    if ((!customerName || !customerEmail || !customerPhone) && customerDoc && customerDoc.length === 11 && config.cpf.configured) {
       try {
         const person = await cpf.lookup(customerDoc);
-        if (person && person.nome) {
-          customerName = person.nome;
+        if (person) {
+          if (!customerName && person.nome) customerName = person.nome;
+          if (!customerEmail && person.email) customerEmail = person.email;
+          if (!customerPhone && person.celular) customerPhone = person.celular;
         }
       } catch (e) {
         /* fallback silencioso */
