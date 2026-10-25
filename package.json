@@ -9,7 +9,7 @@
     "build:mirror": "node tools/build-mirror.cjs",
     "check:mirror": "node tools/build-mirror.cjs --check",
     "utmify:sync": "node tools/sync-past-sales-utmify.cjs",
-    "check": "node --check server.js && node --check api/index.js && node --check lib/quantumpay.js && node --check lib/nitropay.js && node --check lib/cpf.js && node --check lib/cep.js && node --check lib/pix.js && node --check lib/qrimg.js && node --check lib/store.js && node --check lib/products.js && node --check lib/push.js && node --check lib/recovery.js && node --check lib/push-admin.js && node --check lib/utmify.js"
+    "check": "node --check server.js && node --check api/index.js && node --check lib/quantumpay.js && node --check lib/nitropay.js && node --check lib/cpf.js && node --check lib/cep.js && node --check lib/pix.js && node --check lib/qrimg.js && node --check lib/store.js && node --check lib/products.js && node --check lib/push.js && node --check lib/recovery.js && node --check lib/push-admin.js && node --check lib/utmify.js && node --check lib/seo.js"
   },
   "engines": {
     "node": ">=18"

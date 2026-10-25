@@ -44,6 +44,7 @@ const recovery = require('./lib/recovery');
 const pushAdmin = require('./lib/push-admin');
 const utmify = require('./lib/utmify');
 const ga4 = require('./lib/ga4');
+const seo = require('./lib/seo');
 
 let isRunningAutoRecovery = false;
 let lastAutoRecoveryRun = 0;
@@ -1397,12 +1398,12 @@ function serveStatic(req, res, url) {
   if (!exists) {
     /* SPA: rota sem extensão cai no index (roteador client-side). */
     if (path.extname(rel)) return sendText(res, 404, 'Arquivo não encontrado', req);
-    return serveFile(res, path.join(PUBLIC_DIR, 'index.html'), req);
+    return serveFile(res, path.join(PUBLIC_DIR, 'index.html'), req, url.pathname);
   }
-  return serveFile(res, file, req);
+  return serveFile(res, file, req, url.pathname);
 }
 
-function serveFile(res, file, req) {
+function serveFile(res, file, req, requestPath) {
   const ext = path.extname(file).toLowerCase();
   const isHtml = ext === '.html';
   const isSw = path.basename(file) === 'sw.js';
@@ -1419,7 +1420,12 @@ function serveFile(res, file, req) {
   }
 
   try {
-    const data = fs.readFileSync(file);
+    let data = fs.readFileSync(file);
+    if (isHtml) {
+      const htmlStr = data.toString('utf8');
+      const injected = seo.injectSeoIntoHtml(htmlStr, requestPath || '/');
+      data = Buffer.from(injected, 'utf8');
+    }
     const headers = {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Cache-Control': (isHtml || isSw) ? 'no-cache, no-store, must-revalidate' : (immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=86400'),
