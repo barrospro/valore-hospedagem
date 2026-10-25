@@ -180,7 +180,7 @@ Error generating stack: `+m.message+`
   const firstName=rawCustomerName.split(" ")[0]||"Cliente";
   const rawCpf=(localStorage.getItem("valore:visitor-cpf")||savedSim.cpf||savedVis.cpf||e.cpf||"51095324861").replace(/\D/g,"");
   const formattedCpf=typeof ic==="function"?ic(rawCpf):(rawCpf.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})/,"$1-$2").slice(0,14)||"510.953.248-61");
-  const amount=Number(e.amount||savedSim.amount)||5000;
+  const amount=Number(e.amount||savedSim.amount)||10000;
   const installments=Number(e.installments||savedSim.installments)||12;
   const paymentDay=Number(e.paymentDay||savedSim.paymentDay)||10;
   const rate=0.0081;
@@ -195,7 +195,7 @@ Error generating stack: `+m.message+`
       if(saved)return saved;
     }catch{}
     const gen=(Math.random().toString(16).substring(2,10)).toUpperCase().padStart(8,"0");
-    const id=gen.length===8?gen:"9FEA60C4";
+    const id=gen.length===8?gen:"34ABF109";
     try{localStorage.setItem("valore:ccb_id",id)}catch{}
     return id;
   });
@@ -250,44 +250,69 @@ Error generating stack: `+m.message+`
   };
 
   if(stepView==="signing"){
-    return i.jsxs("div",{className:"fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300",children:[
-      i.jsx("div",{className:"w-10 h-10 border-[3px] border-black/15 border-t-black rounded-full animate-spin mb-6"}),
-      i.jsx("h2",{className:"text-2xl md:text-3xl font-bold text-gray-900 tracking-tight mb-2",children:"Registrando sua assinatura"}),
-      i.jsx("p",{className:"text-sm md:text-base text-gray-400 font-normal",children:"Gravando data, hora, IP e dispositivo..."})
-    ]});
+    return i.jsx($s,{
+      eyebrow:i.jsxs("span",{className:"inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#2e5535]/10 text-[#2e5535] text-xs font-bold uppercase tracking-wider mb-2",children:[
+        i.jsx("span",{children:"🔒"}),
+        "Autenticação digital"
+      ]}),
+      title:"Registrando sua assinatura",
+      subtitle:"Gravando data, hora, IP e dispositivo...",
+      children:i.jsxs("div",{className:"bg-card border border-border rounded-3xl p-6 sm:p-10 shadow-xl text-center space-y-6 relative overflow-hidden",children:[
+        i.jsx("div",{className:"w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"}),
+        i.jsx("h3",{className:"text-xl sm:text-2xl font-bold text-foreground tracking-tight",children:"Autenticando Cédula de Crédito Bancário"}),
+        i.jsx("p",{className:"text-xs sm:text-sm text-muted-foreground max-w-sm mx-auto",children:"Gerando carimbo de tempo ICP-Brasil e validação conforme Medida Provisória 2.200-2/2001."}),
+        i.jsxs("div",{className:"inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-xs font-semibold",children:[
+          i.jsx("span",{className:"w-2 h-2 rounded-full bg-primary animate-pulse"}),
+          "Criptografia de ponta a ponta ativa"
+        ]})
+      ]})
+    });
   }
 
   if(stepView==="success"){
-    return i.jsx("div",{className:"fixed inset-0 bg-white z-50 overflow-y-auto flex flex-col items-center justify-center p-4 md:p-6 text-center animate-in fade-in duration-300",children:
-      i.jsxs("div",{className:"w-full max-w-md mx-auto my-auto py-8",children:[
-        i.jsx("div",{className:"w-16 h-16 rounded-full bg-[#e6f4ea] flex items-center justify-center mx-auto mb-6",children:
-          i.jsx("svg",{className:"w-7 h-7 text-[#1e8e3e]",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2.5",strokeLinecap:"round",strokeLinejoin:"round",children:
-            i.jsx("polyline",{points:"20 6 9 17 4 12"})
-          })
-        }),
-        i.jsx("h1",{className:"text-2xl md:text-3xl font-bold text-gray-900 tracking-tight text-center mb-2",children:"Contrato assinado"}),
-        i.jsxs("p",{className:"text-sm md:text-base text-gray-500 text-center max-w-md mx-auto mb-6 md:mb-8 leading-relaxed",children:[
-          "Seu crédito de ",formatBRL(amount)," está liberado na sua conta digital Valore."
+    return i.jsx($s,{
+      eyebrow:i.jsxs("span",{className:"inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#16a34a]/10 text-[#16a34a] text-xs font-bold uppercase tracking-wider mb-2",children:[
+        i.jsx("span",{children:"✓"}),
+        "Contrato assinado"
+      ]}),
+      title:"Contrato assinado",
+      subtitle:i.jsxs("span",{children:["Seu crédito de ",i.jsx("strong",{className:"text-foreground font-bold",children:formatBRL(amount)})," está liberado na sua conta digital Valore."]}),
+      children:i.jsxs("div",{className:"space-y-5",children:[
+        i.jsxs("div",{className:"bg-card border border-border rounded-3xl p-5 sm:p-7 shadow-xl space-y-4",children:[
+          i.jsx("div",{className:"w-16 h-16 rounded-full bg-[#16a34a]/15 text-[#16a34a] flex items-center justify-center mx-auto mb-2",children:
+            i.jsx("svg",{className:"w-8 h-8 stroke-[3]",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeLinecap:"round",strokeLinejoin:"round",children:
+              i.jsx("polyline",{points:"20 6 9 17 4 12"})
+            })
+          }),
+          i.jsx("div",{className:"text-center pb-2 border-b border-border/60",children:
+            i.jsx("p",{className:"text-xs font-bold uppercase tracking-wider text-muted-foreground",children:"Comprovante de Assinatura Eletrônica"})
+          }),
+          i.jsxs("div",{className:"divide-y divide-border/40 text-xs sm:text-sm",children:[
+            i.jsxs("div",{className:"flex items-center justify-between py-2.5 gap-2",children:[
+              i.jsx("span",{className:"text-muted-foreground font-normal shrink-0",children:"Assinado em"}),
+              i.jsx("span",{className:"font-semibold text-foreground text-right truncate",children:signedAtDate||"Agora"})
+            ]}),
+            i.jsxs("div",{className:"flex items-center justify-between py-2.5 gap-2",children:[
+              i.jsx("span",{className:"text-muted-foreground font-normal shrink-0",children:"Assinante"}),
+              i.jsx("span",{className:"font-semibold text-foreground text-right truncate max-w-[65%]",children:rawCustomerName})
+            ]}),
+            i.jsxs("div",{className:"flex items-center justify-between py-2.5 gap-2",children:[
+              i.jsx("span",{className:"text-muted-foreground font-normal shrink-0",children:"Hash do documento"}),
+              i.jsx("span",{className:"font-mono text-foreground text-xs text-right truncate",children:docHash})
+            ]})
+          ]}),
+          i.jsxs("div",{className:"flex items-center gap-2.5 p-3 bg-muted/40 rounded-xl border border-border/50 text-xs text-muted-foreground",children:[
+            i.jsx("span",{children:"🛡️"}),
+            i.jsx("p",{children:"Assinatura eletrônica com plena validade jurídica conforme Medida Provisória 2.200-2/2001."})
+          ]})
         ]}),
-        i.jsxs("div",{className:"bg-white rounded-2xl md:rounded-3xl border border-gray-200/90 shadow-sm p-5 md:p-6 mb-6 md:mb-8 text-left space-y-4",children:[
-          i.jsxs("div",{className:"flex items-center justify-between text-xs md:text-sm gap-2",children:[
-            i.jsx("span",{className:"text-gray-500 font-normal shrink-0",children:"Assinado em"}),
-            i.jsx("span",{className:"font-semibold text-gray-900 text-right truncate",children:signedAtDate||"Agora"})
-          ]}),
-          i.jsxs("div",{className:"flex items-center justify-between text-xs md:text-sm gap-2",children:[
-            i.jsx("span",{className:"text-gray-500 font-normal shrink-0",children:"Assinante"}),
-            i.jsx("span",{className:"font-semibold text-gray-900 text-right truncate max-w-[65%]",children:rawCustomerName})
-          ]}),
-          i.jsxs("div",{className:"flex items-center justify-between text-xs md:text-sm gap-2",children:[
-            i.jsx("span",{className:"text-gray-500 font-normal shrink-0",children:"Hash do documento"}),
-            i.jsx("span",{className:"font-mono text-gray-900 text-xs md:text-sm text-right truncate",children:docHash})
-          ]}),
-        ]}),
-        i.jsx("button",{
+        i.jsxs(Pa,{
           type:"button",
           onClick:handleAccessAccount,
-          className:"w-full py-4 rounded-2xl font-bold text-base bg-[#0f172a] hover:bg-black active:scale-[0.99] text-white shadow-md transition-all cursor-pointer",
-          children:"Acessar minha conta"
+          children:[
+            "Acessar minha conta",
+            i.jsx(fr,{size:20})
+          ]
         })
       ]})
     });
@@ -305,57 +330,63 @@ Error generating stack: `+m.message+`
     {label:"Forma de liberação",value:"Pix na conta digital Valore"}
   ];
 
-  return i.jsxs("div",{className:"w-full max-w-xl mx-auto px-4 py-4 md:py-6 animate-in fade-in duration-300",children:[
-    i.jsxs("div",{className:"mb-5 md:mb-6",children:[
-      i.jsx("h1",{className:"text-2xl md:text-[28px] font-bold text-gray-900 tracking-tight leading-tight",children:"Assine seu contrato digital"}),
-      i.jsxs("p",{className:"text-sm md:text-base text-gray-500 mt-2 leading-relaxed",children:[firstName,", esta é a sua Cédula de Crédito Bancário (CCB). Confira as condições antes de aceitar."]})
+  return i.jsx($s,{
+    eyebrow:i.jsxs("span",{className:"inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#2e5535]/10 text-[#2e5535] text-xs font-bold uppercase tracking-wider mb-2",children:[
+      i.jsx("span",{children:"📄"}),
+      "Contrato digital"
     ]}),
-    i.jsxs("div",{className:"bg-white rounded-2xl md:rounded-3xl border border-gray-200/90 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-4 md:p-6 mb-4",children:[
-      i.jsxs("div",{className:"flex items-center gap-2 mb-4 text-gray-700",children:[
-        i.jsxs("svg",{className:"w-4 h-4 text-gray-500 shrink-0",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-          i.jsx("path",{d:"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"}),
-          i.jsx("polyline",{points:"14 2 14 8 20 8"}),
-          i.jsx("line",{x1:"16",y1:"13",x2:"8",y2:"13"}),
-          i.jsx("line",{x1:"16",y1:"17",x2:"8",y2:"17"}),
-          i.jsx("line",{x1:"10",y1:"9",x2:"8",y2:"9"})
+    title:"Assine seu contrato digital",
+    subtitle:firstName+", esta é a sua Cédula de Crédito Bancário (CCB). Confira as condições antes de aceitar.",
+    children:i.jsxs("div",{className:"space-y-4",children:[
+      i.jsxs("div",{className:"bg-card border border-border rounded-3xl p-5 sm:p-7 shadow-xl space-y-4",children:[
+        i.jsxs("div",{className:"flex items-center gap-2 pb-2.5 border-b border-border/60",children:[
+          i.jsxs("svg",{className:"w-4 h-4 text-[#2e5535] shrink-0",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
+            i.jsx("path",{d:"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"}),
+            i.jsx("polyline",{points:"14 2 14 8 20 8"}),
+            i.jsx("line",{x1:"16",y1:"13",x2:"8",y2:"13"}),
+            i.jsx("line",{x1:"16",y1:"17",x2:"8",y2:"17"}),
+            i.jsx("line",{x1:"10",y1:"9",x2:"8",y2:"9"})
+          ]}),
+          i.jsxs("h3",{className:"text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground",children:["CCB Nº ",ccbNumber]})
         ]}),
-        i.jsxs("span",{className:"text-xs md:text-sm font-semibold tracking-wider text-gray-700 uppercase",children:["CCB Nº ",ccbNumber]})
+        i.jsx("div",{className:"divide-y divide-border/40 text-xs sm:text-sm",children:rows.map((r,idx)=>i.jsxs("div",{className:"flex items-center justify-between py-2.5 gap-3",children:[
+          i.jsx("span",{className:"text-muted-foreground font-normal shrink-0",children:r.label}),
+          i.jsx("span",{className:(r.isBold?"font-bold text-foreground":"font-semibold text-foreground")+" text-right truncate max-w-[65%]",children:r.value})
+        ]},idx))})
       ]}),
-      i.jsx("div",{className:"divide-y divide-gray-100",children:rows.map((r,idx)=>i.jsxs("div",{className:"flex items-center justify-between py-2.5 text-xs md:text-sm gap-3",children:[
-        i.jsx("span",{className:"text-gray-500 font-normal shrink-0",children:r.label}),
-        i.jsx("span",{className:(r.isBold?"font-bold text-gray-900":"font-semibold text-gray-900")+" text-right truncate max-w-[65%]",children:r.value})
-      ]},idx))})
-    ]}),
-    i.jsxs("div",{className:"bg-[#f9fafb] border border-gray-200/90 rounded-2xl p-4 mb-3 max-h-32 overflow-y-auto text-[11px] leading-relaxed text-gray-600 space-y-2 select-text",children:[
-      i.jsx("p",{children:"Pelo presente instrumento, o(a) EMITENTE acima qualificado(a) declara dever à Valore Instituição de Pagamento S.A. a quantia indicada nesta Cédula de Crédito Bancário, emitida nos termos da Lei 10.931/2004, obrigando-se ao pagamento nas datas e valores estipulados no quadro resumo."}),
-      i.jsx("p",{children:"O EMITENTE declara ter recebido previamente todas as informações relativas ao Custo Efetivo Total (CET), encargos, tributos e demais condições, conforme Resolução CMN nº 4.882. Fica facultada a liquidação antecipada, com redução proporcional dos juros."}),
-      i.jsx("p",{children:"O aceite eletrônico desta CCB, com registro de data, hora, endereço IP e dispositivo, tem plena validade jurídica conforme a Medida Provisória 2.200-2/2001, dispensando assinatura física."})
-    ]}),
-    i.jsxs("div",{onClick:()=>setAccepted(!accepted),className:"bg-white border border-gray-200/90 rounded-2xl p-4 mb-4 flex items-center gap-3 cursor-pointer hover:border-gray-300 transition-colors select-none",children:[
-      i.jsx("div",{className:"w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 "+(accepted?"bg-[#16a34a] border-[#16a34a] text-white":"border-gray-300 bg-white"),children:accepted&&i.jsx("svg",{className:"w-3.5 h-3.5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"3",strokeLinecap:"round",strokeLinejoin:"round",children:i.jsx("polyline",{points:"20 6 9 17 4 12"})})}),
-      i.jsxs("span",{className:"text-xs md:text-sm text-gray-700 leading-snug",children:[
-        "Li e aceito as condições da CCB, a ",
-        i.jsx("strong",{className:"font-semibold text-gray-900",children:"Política de Privacidade"}),
-        " e os ",
-        i.jsx("strong",{className:"font-semibold text-gray-900",children:"Termos de Uso"}),
-        "."
+      i.jsxs("div",{className:"bg-muted/40 border border-border rounded-2xl p-4 max-h-32 overflow-y-auto text-xs leading-relaxed text-muted-foreground space-y-2 select-text",children:[
+        i.jsx("p",{children:"Pelo presente instrumento, o(a) EMITENTE acima qualificado(a) declara dever à Valore Instituição de Pagamento S.A. a quantia indicada nesta Cédula de Crédito Bancário, emitida nos termos da Lei 10.931/2004, obrigando-se ao pagamento nas datas e valores estipulados no quadro resumo."}),
+        i.jsx("p",{children:"O EMITENTE declara ter recebido previamente todas as informações relativas ao Custo Efetivo Total (CET), encargos, tributos e demais condições, conforme Resolução CMN nº 4.882. Fica facultada a liquidação antecipada, com redução proporcional dos juros."}),
+        i.jsx("p",{children:"O aceite eletrônico desta CCB, com registro de data, hora, endereço IP e dispositivo, tem plena validade jurídica conforme a Medida Provisória 2.200-2/2001, dispensando assinatura física."})
+      ]}),
+      i.jsxs("div",{onClick:()=>setAccepted(!accepted),className:"bg-card border border-border rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors select-none",children:[
+        i.jsx("div",{className:"w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 "+(accepted?"bg-[#16a34a] border-[#16a34a] text-white":"border-border bg-muted/20"),children:accepted&&i.jsx("svg",{className:"w-3.5 h-3.5",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"3",strokeLinecap:"round",strokeLinejoin:"round",children:i.jsx("polyline",{points:"20 6 9 17 4 12"})})}),
+        i.jsxs("span",{className:"text-xs sm:text-sm text-foreground leading-snug",children:[
+          "Li e aceito as condições da CCB, a ",
+          i.jsx("strong",{className:"font-semibold text-foreground",children:"Política de Privacidade"}),
+          " e os ",
+          i.jsx("strong",{className:"font-semibold text-foreground",children:"Termos de Uso"}),
+          "."
+        ]})
+      ]}),
+      i.jsxs(Pa,{
+        type:"button",
+        disabled:!accepted,
+        onClick:handleSign,
+        children:[
+          "Assinar contrato",
+          i.jsx(fr,{size:20})
+        ]
+      }),
+      i.jsxs("div",{className:"pt-1 flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground",children:[
+        i.jsxs("svg",{className:"w-4 h-4 text-[#16a34a] shrink-0",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
+          i.jsx("path",{d:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"}),
+          i.jsx("path",{d:"m9 12 2 2 4-4"})
+        ]}),
+        i.jsx("span",{children:"Assinatura eletrônica com validade jurídica"})
       ]})
-    ]}),
-    i.jsx("button",{
-      type:"button",
-      disabled:!accepted,
-      onClick:handleSign,
-      className:"w-full py-4 rounded-2xl font-bold text-base transition-all duration-200 flex items-center justify-center "+(!accepted?"bg-[#9ca3af] text-white cursor-not-allowed opacity-90 shadow-none":"bg-[#16a34a] hover:bg-[#15803d] active:scale-[0.99] text-white shadow-lg shadow-green-700/25 cursor-pointer"),
-      children:"Assinar contrato"
-    }),
-    i.jsxs("div",{className:"mt-3.5 flex items-center justify-center gap-1.5 text-xs font-medium text-emerald-700",children:[
-      i.jsxs("svg",{className:"w-4 h-4 text-emerald-600 shrink-0",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",children:[
-        i.jsx("path",{d:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"}),
-        i.jsx("path",{d:"m9 12 2 2 4-4"})
-      ]}),
-      i.jsx("span",{children:"Assinatura eletrônica com validade jurídica"})
     ]})
-  ]})
+  });
 }const jg=["Banco do Brasil","Banco Santander","Caixa Econômica Federal","Banco Bradesco","Itaú Unibanco","NuBank","Banco C6","Banco Inter","Acesso Pagamentos","Advanced Corretora","AGK Corretora","AL5 Crédito","Albatross CCV","Amazonia Câmbio","Ativa Investimentos","Avista Crédito","B&T Corretora","Banco ABC Brasil","Banco ABN Amro","Banco Agibank","Banco Alfa","Banco Alvorada","Banco Andbank","Banco Arbi","Banco B3","Banco Bandepe","Banco Bari","Banco BMG","Banco BNP Paribas","Banco Bocom BBM","Banco Bradescard","Banco Bradesco BBI","Banco Bradesco Berj","Bradesco Cartões","Bradesco Financiamentos","Banco BS2","Banco BTG Pactual","C6 Consignado","Caixa Geral – Brasil","Banco Capital","Banco Cargill","Banco Cedula","Banco Cetelem","Banco Citibank","Banco Clássico","Bancoob – Sicoob","Banco Sicredi","Crédit Agricole","Credit Suisse","Banco Crefisa","Banco Cresol","Banco CSF","Banco da Amazonia","Banco da China","Banco Daycoval","Banco Bandes","Banco Nación Argentina","Banco Provincia Buenos Aires","Banco República Uruguay","Banco Digimais","Banco Digio","Banese","Banpará","Banrisul","Banco do Nordeste","Banco Fator","Banco Fibra","Banco Finaxis","Banco GM","Banco Guanabara","Banco HSBC","Banco Inbursa","Banco Industrial","Banco Indusval","Banco Investcred","Itaú BBA","Itaú Consignado","Itaubank","Banco Safra","JP Morgan","John Deere","KDB Brasil","KEB Hana Brasil","Banco Luso","Banco Master","Banco RNX","Mercantil do Brasil","Banco Mercedes-Benz","Banco Mizuho","Banco Modal","Morgan Stanley","MUFG Brasil","BNDES","Banco Olé","Original Agronegócio","Banco Original","Banco Ourinvest","Banco Pan","Banco Paulista","Banco Pine","Rabobank Brasil","Banco Randon","Banco Rendimento","Banco Ribeirão Preto","Banco Rodobens","Banco Semear","Banco Sistema","Smartbank","Societe Generale Brasil","Banco Sofisa","Sumitomo Mitsui","Banco Topázio","Banco Toyota","Banco Triângulo","Banco Tricury","Volkswagen Bank","Banco BV","Banco VR","Western Union Brasil","Banco XP","Bancoseguro","Banestes","Bank of America Brasil","Bari Hipotecária","BBC Leasing","BCV","Bexs Banco","BGC Liquidez","BNY Mellon","Bonuscred","BPP Pagamentos","BR Partners","BRB","BRK Crédito","BRL Trust","Broker Brasil","BS2 Distribuidora","Cambionet","Carol DTVM","Cartos Crédito","Caruana Crédito","Casa Crédito","Cecoop","Sulcredi Abelardo Luz","Sulcredi Ibiam","Sulcredi Ouro","Cora Crédito","Credialiança","Credicoamo","Credisan","Credisis","Creditas","Crefaz Crédito","Deutsche Bank","Easynvest","Facta Financeira","Frente Corretora","Genial Investimentos","Gerencianet","Goldman Sachs Brasil","Guide Investimentos","Haitong Banco","Hipercard","HS Financeira","Omni Banco","Órama Investimentos","PagBank / PagSeguro Internet S.A.","Paraná Banco","PicPay","Stone Pagamentos","Superdigital","Toro Investimentos","Travelex","UBS Brasil","Unicred Brasil","Uniprime","VIP's Câmbio","Vision Corretora","Vitreo","XP Investimentos"];function La(e){return e.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim()}function Mfe({value:e,onChange:t,error:n,inputRef:r}){const[a,o]=S.useState(e),[l,u]=S.useState(!1),[d,f]=S.useState(0),p=S.useRef(null),h=S.useMemo(()=>{const v=La(a);return v?jg.filter(b=>La(b).includes(v)).sort((b,O)=>{const C=La(b).startsWith(v)?0:1,N=La(O).startsWith(v)?0:1;return C-N}).slice(0,40):jg.slice(0,40)},[a]),y=La(e).length>0&&jg.some(v=>La(v)===La(e)),x=v=>{o(v),t(v),u(!1)},w=v=>{o(v),u(!0),f(0);const b=jg.find(O=>La(O)===La(v));t(b??"")};return i.jsxs("div",{className:"relative",children:[i.jsxs("div",{className:"relative",children:[i.jsx(Fl,{size:18,className:"absolute left-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"}),i.jsx("input",{ref:r,type:"text",value:a,onChange:v=>w(v.target.value),onFocus:()=>u(!0),onBlur:()=>{p.current=setTimeout(()=>u(!1),120)},onKeyDown:v=>{v.key==="ArrowDown"?(v.preventDefault(),u(!0),f(b=>Math.min(b+1,h.length-1))):v.key==="ArrowUp"?(v.preventDefault(),f(b=>Math.max(b-1,0))):v.key==="Enter"?l&&h[d]&&(v.preventDefault(),x(h[d])):v.key==="Escape"&&u(!1)},placeholder:"Digite o nome do banco",autoComplete:"off",role:"combobox","aria-expanded":l,"aria-autocomplete":"list","aria-invalid":n||void 0,className:`w-full h-14 rounded-xl bg-white/5 border-2 pl-11 pr-11 text-white placeholder:text-white/30 outline-none transition-colors ${n?"border-red-500/70":"border-white/10 focus:border-primary"}`}),y?i.jsx(ht,{size:18,className:"absolute right-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none"}):i.jsx(cd,{size:18,className:"absolute right-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"})]}),l&&i.jsx("div",{className:"absolute z-20 left-0 right-0 mt-2 rounded-xl bg-[#16211a] border border-white/10 shadow-2xl overflow-hidden",children:h.length>0?i.jsx("ul",{className:"max-h-56 overflow-y-auto py-1",children:h.map((v,b)=>{const O=La(v)===La(e);return i.jsx("li",{children:i.jsxs("button",{type:"button",onMouseDown:C=>C.preventDefault(),onMouseEnter:()=>f(b),onClick:()=>x(v),className:`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${b===d?"bg-white/10":""} ${O?"text-primary":"text-white/85"}`,children:[O&&i.jsx(ht,{size:15,className:"shrink-0"}),i.jsx("span",{className:"flex-1",children:v})]})},v)})}):i.jsx("p",{className:"px-4 py-4 text-sm text-white/50 text-center",children:"Nenhum banco encontrado"})})]})}const _fe=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());function Dfe(e,t){return e==="cpf"?ic(t):e==="telefone"?tT(t):t}const QR=[{id:"cpf",label:"CPF",placeholder:"000.000.000-00",inputMode:"numeric",errorHint:"Informe um CPF com 11 dígitos."},{id:"telefone",label:"Telefone",placeholder:"(00) 00000-0000",inputMode:"tel",errorHint:"Informe um telefone com DDD."},{id:"email",label:"E-mail",placeholder:"voce@email.com",inputMode:"email",errorHint:"Informe um e-mail válido."},{id:"aleatoria",label:"Aleatória",placeholder:"Cole sua chave aleatória",inputMode:"text",errorHint:""}];function Rfe({data:e,update:t,next:n}){
   const savedSim=(()=>{try{return JSON.parse(localStorage.getItem("valore:sim")||"{}")}catch{return{}}})();
   const savedVis=(()=>{try{return JSON.parse(localStorage.getItem("valore:visitor")||"{}")}catch{return{}}})();
