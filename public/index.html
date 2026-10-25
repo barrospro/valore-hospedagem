@@ -40,26 +40,19 @@
       function getAnalyticsUserId() {
         try {
           var vId = localStorage.getItem('valore:visitor_id');
-          if (vId) return vId;
+          if (vId && /^vis_[a-f0-9-]{16,36}$/i.test(vId)) return vId;
           var rawVis = localStorage.getItem('valore:visitor');
           if (rawVis) {
             var vis = JSON.parse(rawVis);
-            if (vis && vis.id) return String(vis.id);
+            if (vis && vis.id && /^vis_[a-f0-9-]{16,36}$/i.test(vis.id)) return String(vis.id);
           }
-          var rawDoc = localStorage.getItem('valore:visitor-cpf') || '';
-          if (!rawDoc) {
-            var sim = JSON.parse(localStorage.getItem('valore:sim') || '{}');
-            rawDoc = (sim && sim.cpf) || '';
-          }
-          var clean = String(rawDoc).replace(/\D/g, '');
-          if (clean.length === 11) return 'usr_' + clean;
         } catch (e) {}
         return null;
       }
 
       var initialUserId = getAnalyticsUserId();
       var gaConfig = {
-        send_page_view: true
+        send_page_view: false
       };
       if (initialUserId) {
         gaConfig.user_id = initialUserId;
@@ -67,18 +60,16 @@
 
       gtag('config', 'G-3NGR6D3GKF', gaConfig);
       if (initialUserId) {
-        gtag('set', 'user_properties', { user_id: initialUserId });
+        gtag('set', { user_id: initialUserId });
       }
 
-      window.setAnalyticsUser = function(id, props) {
-        if (!id) return;
+      window.setAnalyticsUser = function(id) {
+        if (!id || typeof id !== 'string' || !/^vis_[a-f0-9-]{16,36}$/i.test(id)) return;
         try {
-          gtag('config', 'G-3NGR6D3GKF', Object.assign({ user_id: String(id) }, props || {}));
-          gtag('set', 'user_properties', Object.assign({ user_id: String(id) }, props || {}));
+          gtag('set', { user_id: id });
         } catch (e) {}
       };
 
-      // Dispara User-ID em tempo real assim que o usuário preenche dados no funil
       try {
         var checkUserInterval = setInterval(function() {
           var uid = getAnalyticsUserId();
@@ -123,8 +114,25 @@
           return p.startsWith('/dash') || p.startsWith('/p/');
         }
 
-        // 1. Rastreia PageView em todas as trocas de rota na SPA
-        var lastTrackedPath = window.location.pathname + window.location.search;
+        // Captura client_id e session_id reais dos cookies oficiais do Google Analytics
+        function getGaCookieClientId() {
+          try {
+            var match = document.cookie.match(/(?:^|;\s*)_ga=GA1\.[0-9]+\.([0-9]+\.[0-9]+)/);
+            if (match) return match[1];
+          } catch (e) {}
+          return undefined;
+        }
+
+        function getGaCookieSessionId() {
+          try {
+            var match = document.cookie.match(/(?:^|;\s*)_ga_3NGR6D3GKF=GS[0-9]+\.[0-9]+\.([0-9]+)/);
+            if (match) return match[1];
+          } catch (e) {}
+          return undefined;
+        }
+
+        // 1. Rastreia PageView em todas as trocas de rota na SPA e na carga inicial
+        var lastTrackedPath = null;
         function trackSpaPageView() {
           if (isAdminRoute()) return;
           var currentPath = window.location.pathname + window.location.search;
@@ -136,14 +144,51 @@
             if (typeof window.gtag === 'function') {
               window.gtag('event', 'page_view', {
                 page_path: currentPath,
-                page_location: window.location.href
+                page_location: window.location.href,
+                page_title: document.title || 'Valore'
               });
             }
-          }
-          if (typeof checkPostPaymentState === 'function') {
-            checkPostPaymentState();
+
+            // qualify_lead: disparado exclusivamente quando o cliente alcança a tela de contrato com crédito aprovado
+            if (window.location.pathname === '/contrato') {
+              try {
+                if (!sessionStorage.getItem('valore_ga4_lead_qualified')) {
+                  sessionStorage.setItem('valore_ga4_lead_qualified', '1');
+                  var simData = JSON.parse(localStorage.getItem('valore:sim') || '{}');
+                  var approvedVal = Number(simData.amount || 5000);
+                  if (typeof window.gtag === 'function') {
+                    window.gtag('event', 'qualify_lead', {
+                      value: approvedVal,
+                      currency: 'BRL',
+                      status: 'approved'
+                    });
+                  }
+                }
+              } catch (e) {}
+            }
+
+            // close_convert_lead: disparado na confirmação real de formalização do empréstimo
+            if (window.location.pathname === '/confirmacao' || window.location.pathname === '/digital') {
+              try {
+                if (!sessionStorage.getItem('valore_ga4_lead_converted')) {
+                  sessionStorage.setItem('valore_ga4_lead_converted', '1');
+                  var simC = JSON.parse(localStorage.getItem('valore:sim') || '{}');
+                  var convVal = Number(simC.amount || 5000);
+                  if (typeof window.gtag === 'function') {
+                    window.gtag('event', 'close_convert_lead', {
+                      value: convVal,
+                      currency: 'BRL',
+                      contract_status: 'signed'
+                    });
+                  }
+                }
+              } catch (e) {}
+            }
           }
         }
+
+        // Dispara o page_view da carga inicial controlada
+        setTimeout(trackSpaPageView, 0);
 
         var origPushState = history.pushState;
         if (origPushState) {
@@ -167,7 +212,7 @@
           setTimeout(trackSpaPageView, 0);
         });
 
-        // 2. Intercepta requisições de API para disparar eventos de conversão (Lead, InitiateCheckout, Purchase)
+        // 2. Intercepta requisições de API para disparar eventos de conversão
         var origFetch = window.fetch;
         if (!origFetch) return;
 
@@ -195,7 +240,7 @@
             if (sessionStorage.getItem('order_cloaked_' + orderId) === '1' || sessionStorage.getItem('order_ch_' + orderId) === 'cloaked') {
               trackedPurchases[orderId] = true;
               sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
-              return; // INDETECTAVEL: Suprime Purchase no Meta Pixel
+              return;
             }
           } catch (e) {}
 
@@ -213,49 +258,7 @@
               content_type: 'product'
             }, { eventID: orderId });
           }
-          if (typeof window.gtag === 'function') {
-            window.gtag('event', 'purchase', {
-              transaction_id: orderId,
-              value: val,
-              currency: 'BRL',
-              items: [{
-                item_id: orderId,
-                item_name: 'Simulação Empréstimo',
-                price: val,
-                quantity: 1
-              }]
-            });
-            window.gtag('event', 'close_convert_lead', {
-              transaction_id: orderId,
-              value: val,
-              currency: 'BRL'
-            });
-          }
-        }
-
-        function checkPostPaymentState() {
-          try {
-            var path = window.location.pathname || '';
-            var bodyText = (document.body && (document.body.innerText || document.body.textContent)) || '';
-            var isConfirmed = bodyText.indexOf('Pagamento confirmado') !== -1 || path.indexOf('/iof') !== -1;
-            if (isConfirmed) {
-              var orderIds = Object.keys(orderAmounts);
-              if (orderIds.length > 0) {
-                var lastId = orderIds[orderIds.length - 1];
-                if (lastId && !trackedPurchases[lastId]) {
-                  if (sessionStorage.getItem('order_cloaked_' + lastId) === '1' || sessionStorage.getItem('order_ch_' + lastId) === 'cloaked') {
-                    trackedPurchases[lastId] = true;
-                    return;
-                  }
-                  firePurchase(lastId, orderAmounts[lastId]);
-                }
-              }
-            }
-          } catch (e) {}
-        }
-
-        if (typeof setInterval === 'function') {
-          setInterval(checkPostPaymentState, 1500);
+          // GA4 Purchase é emitido exclusivamente pelo Backend (Measurement Protocol) com idempotência
         }
 
         window.fetch = function() {
@@ -307,6 +310,10 @@
                   var savedEmail = sessionStorage.getItem('valore_customer_email');
                   if (savedEmail) oBody.customer.email = savedEmail;
                 }
+                var gaCid = getGaCookieClientId();
+                if (gaCid) oBody.clientId = gaCid;
+                var gaSid = getGaCookieSessionId();
+                if (gaSid) oBody.sessionId = gaSid;
                 args[1].body = JSON.stringify(oBody);
               }
             }
@@ -339,8 +346,10 @@
                       window.fbq('track', 'Lead');
                     }
                     if (typeof window.gtag === 'function') {
-                      window.gtag('event', 'generate_lead');
-                      window.gtag('event', 'qualify_lead');
+                      window.gtag('event', 'generate_lead', {
+                        lead_type: 'emprestimo',
+                        method: 'cpf_lookup'
+                      });
                     }
                   }
                 }).catch(function() {});
@@ -361,8 +370,10 @@
                       window.fbq('track', 'Lead');
                     }
                     if (typeof window.gtag === 'function') {
-                      window.gtag('event', 'generate_lead');
-                      window.gtag('event', 'qualify_lead');
+                      window.gtag('event', 'generate_lead', {
+                        lead_type: 'emprestimo',
+                        method: 'visitor_registration'
+                      });
                     }
                   }
                 }).catch(function() {});

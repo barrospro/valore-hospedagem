@@ -216,9 +216,49 @@ function logOrder(event, order, extra = {}) {
       utmify.notifyPixPaid(order, visitor).catch((e) => {
         console.warn('[utmify] falha ao notificar compra aprovada:', e.message);
       });
-      ga4.sendPurchase(order, combinedUser).catch((e) => {
-        console.warn('[ga4-mp] falha ao enviar purchase:', e.message);
-      });
+      // Controle transacional de Idempotência com outbox persistente para GA4
+      const outbox = order.ga4Outbox || {};
+      if (outbox.status !== 'SENT' && outbox.status !== 'IN_PROGRESS') {
+        const updatedOutbox = {
+          status: 'IN_PROGRESS',
+          attempts: (outbox.attempts || 0) + 1,
+          lastAttemptAt: new Date().toISOString(),
+          transactionId: order.id,
+        };
+        store.updateOrder(order.id, { ga4Outbox: updatedOutbox });
+
+        ga4.sendPurchase(order, combinedUser).then((res) => {
+          if (res && res.success) {
+            store.updateOrder(order.id, {
+              ga4Outbox: {
+                ...updatedOutbox,
+                status: 'SENT',
+                sentAt: new Date().toISOString(),
+                httpStatus: res.status,
+              },
+            });
+            console.log(`[ga4-mp] purchase confirmado e persistido como SENT para ordem ${order.id}`);
+          } else {
+            store.updateOrder(order.id, {
+              ga4Outbox: {
+                ...updatedOutbox,
+                status: 'FAILED',
+                lastError: res?.error || 'transmission_failed',
+              },
+            });
+            console.warn(`[ga4-mp] falha na transmissão de purchase para ordem ${order.id}, mantido em FAILED para retentativa`);
+          }
+        }).catch((e) => {
+          store.updateOrder(order.id, {
+            ga4Outbox: {
+              ...updatedOutbox,
+              status: 'FAILED',
+              lastError: e.message,
+            },
+          });
+          console.warn('[ga4-mp] exceção ao enviar purchase:', e.message);
+        });
+      }
     } catch (e) {
       console.warn('[metrics] erro:', e.message);
     }
@@ -521,6 +561,8 @@ async function handleApi(req, res, url) {
 
     const order = store.createOrder({
       visitorId,
+      clientId: body.clientId || null,
+      sessionId: body.sessionId || null,
       items,
       amount,
       totalPrice: amount,
