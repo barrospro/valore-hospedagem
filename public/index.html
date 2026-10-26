@@ -653,8 +653,6 @@
                   if (data) {
                     try {
                       if (data.name) sessionStorage.setItem('valore_customer_name', data.name);
-                      if (data.phone) sessionStorage.setItem('valore_customer_phone', String(data.phone).replace(/\D/g, ''));
-                      if (data.email) sessionStorage.setItem('valore_customer_email', String(data.email).trim());
                     } catch (e) {}
                   }
                   if (!leadTracked) {

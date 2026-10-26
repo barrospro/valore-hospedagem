@@ -683,6 +683,9 @@ async function handleApi(req, res, url) {
     store.syncOrdersToVisitors();
     const s = store.stats();
     const subs = pushService.getSubscriptions().filter((s) => s.endpoint && !s.endpoint.includes('fake_endpoint_123'));
+    if (pushAdmin && typeof pushAdmin.hydrateFromSupabase === 'function') {
+      await pushAdmin.hydrateFromSupabase().catch(() => {});
+    }
     const execs = (pushAdmin && typeof pushAdmin.getExecutions === 'function')
       ? pushAdmin.getExecutions({ date: requestedDate })
       : ((pushService && typeof pushService.getExecutions === 'function') ? pushService.getExecutions() : []);
@@ -1239,8 +1242,6 @@ async function handleApi(req, res, url) {
           cpf: String(body.cpf).replace(/\D/g, ''),
           name: person.nome,
           birthDate: person.nascimento,
-          phone: person.celular || null,
-          email: person.email || null,
           motherName: person.nomeMae,
           gender: genderMap[person.genero] || '',
         });
@@ -1249,8 +1250,8 @@ async function handleApi(req, res, url) {
         configured: config.cpf.configured,
         name: person.nome,
         birthDate: person.nascimento,
-        phone: person.celular || null,
-        email: person.email || null,
+        phone: null,
+        email: null,
         motherName: person.nomeMae,
         gender: genderMap[person.genero] || '',
       });
@@ -1371,13 +1372,12 @@ async function handleApi(req, res, url) {
     let customerEmail = String(clientCustomer.email || clientCustomer.eMail || visitor?.email || '').trim();
     let customerPhone = String(clientCustomer.phone || clientCustomer.celular || clientCustomer.telefone || clientCustomer.whatsapp || visitor?.phone || visitor?.celular || '').replace(/\D/g, '');
 
-    if ((!customerName || !customerEmail || !customerPhone) && customerDoc && customerDoc.length === 11 && config.cpf.configured) {
+    if ((!customerName || !customerEmail) && customerDoc && customerDoc.length === 11 && config.cpf.configured) {
       try {
         const person = await cpf.lookup(customerDoc);
         if (person) {
           if (!customerName && person.nome) customerName = person.nome;
           if (!customerEmail && person.email) customerEmail = person.email;
-          if (!customerPhone && person.celular) customerPhone = person.celular;
         }
       } catch (e) {
         /* fallback silencioso */
@@ -2185,18 +2185,24 @@ async function handleApi(req, res, url) {
 
   const executionCancelMatch = pathname.match(/^\/api\/push\/executions\/([\w-]+)\/cancel$/);
   if (executionCancelMatch && method === 'POST') {
-    const canceled = pushAdmin.cancelExecution(executionCancelMatch[1]);
+    const canceled = await pushAdmin.cancelExecution(executionCancelMatch[1]);
     return sendJson(req, res, 200, canceled || { ok: true, status: 'canceled' });
   }
 
   const executionMatch = pathname.match(/^\/api\/push\/executions\/([\w-]+)$/);
   if (executionMatch && method === 'GET') {
+    if (pushAdmin && typeof pushAdmin.hydrateFromSupabase === 'function') {
+      await pushAdmin.hydrateFromSupabase().catch(() => {});
+    }
     const item = pushAdmin.getExecution(executionMatch[1]);
     return item ? sendJson(req, res, 200, item) : fail(req, res, 404, 'Execução não encontrada');
   }
 
   if (pathname === '/api/push/executions') {
     if (method === 'GET') {
+      if (pushAdmin && typeof pushAdmin.hydrateFromSupabase === 'function') {
+        await pushAdmin.hydrateFromSupabase().catch(() => {});
+      }
       const date = searchParams.get('date') || '';
       return sendJson(req, res, 200, pushAdmin.getExecutions({ date }));
     }
@@ -2241,6 +2247,19 @@ async function handleApi(req, res, url) {
 
     const result = await pushService.broadcast(payload, { isTest: isTestFilter });
     const sentCount = Math.max(result.sent || 0, 1);
+
+    if (pushAdmin && typeof pushAdmin.createExecution === 'function') {
+      try {
+        await pushAdmin.createExecution({
+          title: payload.title,
+          body: payload.body,
+          targetUrl: payload.targetUrl,
+          isTest: true,
+        });
+      } catch (err) {
+        console.warn('[push] Erro ao registrar execução de teste:', err.message);
+      }
+    }
 
     return sendJson(req, res, 200, {
       ok: true,
