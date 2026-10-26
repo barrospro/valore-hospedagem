@@ -1988,6 +1988,23 @@ function rqe() {
     [activeCheckoutSuccess, setActiveCheckoutSuccess] = S.useState(!1),
     [isDeletingGw, setIsDeletingGw] = S.useState(!1);
 
+  const getAuthHeaders = async () => {
+    let tok = null;
+    try {
+      if (typeof DA === "function") tok = await DA();
+      if (!tok && typeof M9 === "function") tok = M9();
+    } catch {}
+    if (!tok) {
+      try {
+        tok = localStorage.getItem("adm_token") || localStorage.getItem("valore_admin_token") || sessionStorage.getItem("adm_token");
+      } catch {}
+    }
+    return {
+      "Content-Type": "application/json",
+      ...(tok ? { "Authorization": "Bearer " + tok } : {})
+    };
+  };
+
   S.useEffect(() => {
     if (!t) return;
     const I = {};
@@ -2081,9 +2098,10 @@ function rqe() {
     setIsValidatingApi(true);
     setApiValidationResult(null);
     try {
+      const hdrs = await getAuthHeaders();
       const resp = await fetch("/api/gateway-test", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify({
           gatewayId: N.id,
           provider: N.provider || N.id,
@@ -2091,7 +2109,15 @@ function rqe() {
         })
       });
       const data = await resp.json();
-      setApiValidationResult(data);
+      if (!resp.ok && data?.error) {
+        setApiValidationResult({
+          ok: false,
+          elapsedMs: data.elapsedMs,
+          error: data.error
+        });
+      } else {
+        setApiValidationResult(data);
+      }
     } catch (err) {
       setApiValidationResult({
         ok: false,
@@ -2107,9 +2133,10 @@ function rqe() {
     setWebhookSyncSuccess(null);
     try {
       const isAct = webhookActiveMap[N.id] ?? (N.webhookActive !== false);
+      const hdrs = await getAuthHeaders();
       const resp = await fetch("/api/integrations/" + N.id + "/webhook-sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify({ webhookActive: isAct })
       });
       const data = await resp.json();
@@ -2131,9 +2158,10 @@ function rqe() {
     const nextVal = !current;
     setWebhookActiveMap(prev => ({ ...prev, [N.id]: nextVal }));
     try {
+      const hdrs = await getAuthHeaders();
       await fetch("/api/integrations/" + N.id + "/webhook-sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify({ webhookActive: nextVal })
       });
       e.invalidateQueries({ queryKey: s9() });
@@ -2144,9 +2172,10 @@ function rqe() {
     setIsSettingActiveCheckout(true);
     setActiveCheckoutSuccess(false);
     try {
+      const hdrs = await getAuthHeaders();
       const resp = await fetch("/api/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify({ activeGatewayId: N.id })
       });
       if (resp.ok) {
@@ -2169,9 +2198,10 @@ function rqe() {
     setIsAddingGw(true);
     setAddGwError("");
     try {
+      const hdrs = await getAuthHeaders();
       const resp = await fetch("/api/integrations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify({
           name: newGwName.trim(),
           provider: newGwProvider,
@@ -2199,7 +2229,11 @@ function rqe() {
     if (!window.confirm("Confirma a remoção do gateway " + N.name + "?")) return;
     setIsDeletingGw(true);
     try {
-      const resp = await fetch("/api/integrations/" + N.id, { method: "DELETE" });
+      const hdrs = await getAuthHeaders();
+      const resp = await fetch("/api/integrations/" + N.id, {
+        method: "DELETE",
+        headers: hdrs
+      });
       const data = await resp.json();
       if (data.ok) {
         e.invalidateQueries({ queryKey: s9() });
