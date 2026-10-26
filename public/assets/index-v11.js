@@ -1935,6 +1935,12 @@ function AdminUsersTab() {
   const [error, setError] = S.useState('');
   const [success, setSuccess] = S.useState('');
 
+  // Estados de edição de usuário
+  const [editingUser, setEditingUser] = S.useState(null);
+  const [editShowPass, setEditShowPass] = S.useState(false);
+  const [savingEdit, setSavingEdit] = S.useState(false);
+  const [editError, setEditError] = S.useState('');
+
   const loadUsers = () => {
     setLoading(true);
     Ne('/api/admin/users', { method: 'GET' })
@@ -1951,8 +1957,12 @@ function AdminUsersTab() {
 
   const handleCreate = (e) => {
     e.preventDefault();
-    if (!name || !username || !password) {
+    if (!name.trim() || !username.trim() || !password) {
       setError('Preencha todos os campos obrigatórios');
+      return;
+    }
+    if (password.length < 4) {
+      setError('A senha deve ter pelo menos 4 caracteres');
       return;
     }
     setSaving(true);
@@ -1960,11 +1970,11 @@ function AdminUsersTab() {
     setSuccess('');
     Ne('/api/admin/users', {
       method: 'POST',
-      body: JSON.stringify({ name, username, password, role })
+      body: JSON.stringify({ name: name.trim(), username: username.trim().toLowerCase(), password, role })
     })
       .then(res => {
         setSaving(false);
-        setSuccess('Usuário "' + (res.name || username) + '" adicionado com sucesso!');
+        setSuccess('Usuário "' + (res.name || username) + '" adicionado com sucesso e salvo no Supabase!');
         setName('');
         setUsername('');
         setPassword('');
@@ -1977,11 +1987,67 @@ function AdminUsersTab() {
       });
   };
 
+  const handleStartEdit = (u) => {
+    setEditingUser({
+      id: u.id,
+      name: u.name || '',
+      username: u.username || '',
+      role: u.role || 'admin',
+      active: u.active !== false,
+      password: ''
+    });
+    setEditError('');
+    setShowAdd(false);
+  };
+
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    if (!editingUser.name.trim() || !editingUser.username.trim()) {
+      setEditError('Nome e usuário são obrigatórios');
+      return;
+    }
+    if (editingUser.password && editingUser.password.length < 4) {
+      setEditError('A nova senha deve ter no mínimo 4 caracteres');
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError('');
+    const payload = {
+      name: editingUser.name.trim(),
+      username: editingUser.username.trim().toLowerCase(),
+      role: editingUser.role,
+      active: editingUser.active,
+      ...(editingUser.password ? { password: editingUser.password } : {})
+    };
+
+    Ne('/api/admin/users/' + editingUser.id, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    })
+      .then(res => {
+        setSavingEdit(false);
+        setEditingUser(null);
+        setSuccess('Usuário "' + (res.name || editingUser.username) + '" atualizado com sucesso!');
+        loadUsers();
+      })
+      .catch(err => {
+        setSavingEdit(false);
+        setEditError(err?.data?.error || err?.message || 'Erro ao atualizar usuário');
+      });
+  };
+
   const handleDelete = (id, uName) => {
-    if (!confirm('Deseja realmente remover o acesso de "' + uName + '"?')) return;
+    if (users.length <= 1) {
+      alert('Não é possível excluir o único usuário com acesso ao painel.');
+      return;
+    }
+    if (!confirm('Deseja realmente remover o acesso de "' + uName + '"?\nEsta ação revogará o login imediatamente.')) return;
     Ne('/api/admin/users/' + id, { method: 'DELETE' })
       .then(() => {
-        setSuccess('Usuário removido com sucesso.');
+        setSuccess('Usuário "' + uName + '" removido com sucesso.');
+        if (editingUser && editingUser.id === id) setEditingUser(null);
         loadUsers();
       })
       .catch(err => alert(err?.data?.error || 'Erro ao remover usuário'));
@@ -1995,10 +2061,10 @@ function AdminUsersTab() {
           className: "inline-flex items-center gap-2",
           children: [i.jsx(Mn, { size: 14, className: "text-emerald-400" }), " Usuários com Acesso ao Painel"]
         }),
-        subtitle: "Controle de perfis, administradores e operadores autorizados a acessar o painel",
+        subtitle: "Controle de administradores e operadores autorizados a acessar o painel (sincronizado no Supabase)",
         actions: i.jsxs("button", {
           type: "button",
-          onClick: () => { setShowAdd(!showAdd); setError(''); setSuccess(''); },
+          onClick: () => { setShowAdd(!showAdd); setEditingUser(null); setError(''); setSuccess(''); },
           className: "inline-flex items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-emerald-400 hover:scale-[1.02]",
           children: [showAdd ? "Fechar Formulário" : "+ Novo Usuário"]
         }),
@@ -2011,7 +2077,7 @@ function AdminUsersTab() {
                 className: "flex items-center justify-between border-b border-card-border pb-3",
                 children: [
                   i.jsx("h4", { className: "text-sm font-semibold text-emerald-400", children: "Cadastrar Perfil de Acesso" }),
-                  i.jsx("span", { className: "text-[0.68rem] text-muted-foreground", children: "Sincronizado em tempo real no Supabase" })
+                  i.jsx("span", { className: "text-[0.68rem] text-muted-foreground", children: "Sincronizado em nuvem no Supabase" })
                 ]
               }),
               i.jsxs("div", {
@@ -2104,6 +2170,125 @@ function AdminUsersTab() {
               })
             ]
           }),
+
+          editingUser && i.jsxs("form", {
+            onSubmit: handleSaveEdit,
+            className: "mb-6 rounded-xl border border-sky-500/30 bg-sky-500/[0.04] p-5 space-y-4",
+            children: [
+              i.jsxs("div", {
+                className: "flex items-center justify-between border-b border-card-border pb-3",
+                children: [
+                  i.jsxs("h4", { className: "text-sm font-semibold text-sky-400", children: ["Editar Usuário: ", editingUser.name] }),
+                  i.jsx("span", { className: "text-[0.68rem] text-muted-foreground", children: "Atualização imediata com Supabase" })
+                ]
+              }),
+              i.jsxs("div", {
+                className: "grid gap-4 sm:grid-cols-2",
+                children: [
+                  i.jsxs("div", {
+                    children: [
+                      i.jsx("label", { className: "mb-1 block text-xs font-medium text-foreground", children: "Nome Completo" }),
+                      i.jsx("input", {
+                        type: "text",
+                        required: true,
+                        value: editingUser.name,
+                        onChange: e => setEditingUser({ ...editingUser, name: e.target.value }),
+                        className: "w-full rounded-md border border-input bg-background px-3 py-2 text-xs outline-none focus:border-sky-500"
+                      })
+                    ]
+                  }),
+                  i.jsxs("div", {
+                    children: [
+                      i.jsx("label", { className: "mb-1 block text-xs font-medium text-foreground", children: "Usuário de Login" }),
+                      i.jsx("input", {
+                        type: "text",
+                        required: true,
+                        value: editingUser.username,
+                        onChange: e => setEditingUser({ ...editingUser, username: e.target.value.toLowerCase().trim() }),
+                        className: "w-full rounded-md border border-input bg-background px-3 py-2 text-xs outline-none focus:border-sky-500"
+                      })
+                    ]
+                  }),
+                  i.jsxs("div", {
+                    children: [
+                      i.jsx("label", { className: "mb-1 block text-xs font-medium text-foreground", children: "Nova Senha (opcional)" }),
+                      i.jsxs("div", {
+                        className: "relative",
+                        children: [
+                          i.jsx("input", {
+                            type: editShowPass ? "text" : "password",
+                            value: editingUser.password,
+                            onChange: e => setEditingUser({ ...editingUser, password: e.target.value }),
+                            placeholder: "Deixe em branco para manter a atual",
+                            className: "w-full rounded-md border border-input bg-background py-2 pl-3 pr-9 text-xs outline-none focus:border-sky-500"
+                          }),
+                          i.jsx("button", {
+                            type: "button",
+                            onClick: () => setEditShowPass(!editShowPass),
+                            className: "absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground",
+                            children: editShowPass ? i.jsx(lv, { size: 14 }) : i.jsx(cv, { size: 14 })
+                          })
+                        ]
+                      })
+                    ]
+                  }),
+                  i.jsxs("div", {
+                    className: "grid grid-cols-2 gap-2",
+                    children: [
+                      i.jsxs("div", {
+                        children: [
+                          i.jsx("label", { className: "mb-1 block text-xs font-medium text-foreground", children: "Cargo / Permissão" }),
+                          i.jsxs("select", {
+                            value: editingUser.role,
+                            onChange: e => setEditingUser({ ...editingUser, role: e.target.value }),
+                            className: "w-full rounded-md border border-input bg-background px-2.5 py-2 text-xs outline-none focus:border-sky-500",
+                            children: [
+                              i.jsx("option", { value: "admin", children: "Administrador" }),
+                              i.jsx("option", { value: "operador", children: "Operador" }),
+                              i.jsx("option", { value: "visualizador", children: "Visualizador" })
+                            ]
+                          })
+                        ]
+                      }),
+                      i.jsxs("div", {
+                        children: [
+                          i.jsx("label", { className: "mb-1 block text-xs font-medium text-foreground", children: "Status" }),
+                          i.jsxs("select", {
+                            value: editingUser.active ? "true" : "false",
+                            onChange: e => setEditingUser({ ...editingUser, active: e.target.value === "true" }),
+                            className: "w-full rounded-md border border-input bg-background px-2.5 py-2 text-xs outline-none focus:border-sky-500",
+                            children: [
+                              i.jsx("option", { value: "true", children: "Ativo" }),
+                              i.jsx("option", { value: "false", children: "Inativo / Bloqueado" })
+                            ]
+                          })
+                        ]
+                      })
+                    ]
+                  })
+                ]
+              }),
+              editError && i.jsxs("p", { className: "text-xs text-red-400 flex items-center gap-1", children: [i.jsx(ey, { size: 13 }), editError] }),
+              i.jsxs("div", {
+                className: "flex justify-end gap-2 pt-2",
+                children: [
+                  i.jsx("button", {
+                    type: "button",
+                    onClick: () => setEditingUser(null),
+                    className: "rounded-md border border-card-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-white/[0.04]",
+                    children: "Cancelar"
+                  }),
+                  i.jsxs("button", {
+                    type: "submit",
+                    disabled: savingEdit,
+                    className: "inline-flex items-center gap-1.5 rounded-md bg-sky-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-sky-400 disabled:opacity-50",
+                    children: [savingEdit && i.jsx(De, { size: 12, className: "animate-spin" }), "Salvar Alterações"]
+                  })
+                ]
+              })
+            ]
+          }),
+
           success && i.jsxs("div", {
             className: "mb-4 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-400",
             children: [i.jsx(ht, { size: 14 }), success]
@@ -2133,7 +2318,6 @@ function AdminUsersTab() {
                 }),
                 i.jsx("tbody", {
                   children: users.map(u => {
-                    const isMaster = u.username === 'admin' || u.id === 'usr_admin_master';
                     return i.jsxs("tr", {
                       className: "border-b border-card-border/60 last:border-0 hover:bg-white/[0.02]",
                       children: [
@@ -2162,17 +2346,22 @@ function AdminUsersTab() {
                             children: u.active !== false ? "Ativo" : "Inativo"
                           })
                         }),
-                        i.jsx("td", {
-                          className: "py-3 text-right",
-                          children: !isMaster && users.length > 1 ? i.jsxs("button", {
-                            type: "button",
-                            onClick: () => handleDelete(u.id, u.name),
-                            className: "inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-400 hover:bg-red-500/10 transition-colors",
-                            children: [i.jsx(J2, { size: 12 }), " Excluir"]
-                          }) : i.jsx("span", {
-                            className: "text-[0.65rem] text-muted-foreground italic",
-                            children: "Principal"
-                          })
+                        i.jsxs("td", {
+                          className: "py-3 text-right space-x-1.5",
+                          children: [
+                            i.jsx("button", {
+                              type: "button",
+                              onClick: () => handleStartEdit(u),
+                              className: "inline-flex items-center rounded border border-card-border bg-card px-2 py-1 text-xs text-foreground hover:bg-white/[0.06] transition-colors",
+                              children: "Editar"
+                            }),
+                            users.length > 1 && i.jsxs("button", {
+                              type: "button",
+                              onClick: () => handleDelete(u.id, u.name),
+                              className: "inline-flex items-center gap-1 rounded border border-red-500/30 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10 transition-colors",
+                              children: [i.jsx(J2, { size: 12 }), " Excluir"]
+                            })
+                          ]
                         })
                       ]
                     }, u.id);
@@ -2187,75 +2376,6 @@ function AdminUsersTab() {
   });
 }
 
-function N6e(){const e=ta(),{data:t}=nE(),{data:n,isLoading:r}=spe(),{data:a,isLoading:o}=Fpe({limit:100}),{data:l,isLoading:u}=Kpe({query:{queryKey:Rv(),refetchInterval:6e4}}),d=ppe(),f=dpe(),[p,h]=S.useState("geral"),[y,x]=S.useState(!1),w=()=>{e.invalidateQueries({queryKey:p9()}),e.invalidateQueries({queryKey:g9()}),e.invalidateQueries({queryKey:rE({limit:100})})},v=n??[],b=y?v:v.slice(0,6),O=a??[],C=t?.pathKey??"",N=`${window.location.origin}/p/${C||Gxe()}`,E=(l?.items??[]).filter(k=>k.active).length,T=t?.passwordFromEnv??!1,P=t?.pathKeyFromEnv??!1;return i.jsxs("div",{className:"space-y-5",children:[i.jsxs("div",{className:"grid gap-4 grid-cols-2 xl:grid-cols-4",children:[i.jsx(Ml,{label:"Acessos ativos",icon:by,hint:"Dispositivos conectados",children:i.jsx("span",{className:"text-2xl font-semibold tabular-nums",children:t?.activeSessions??"—"})}),i.jsx(Ml,{label:"Bloqueados",icon:Ci,hint:E>0?"Não abrem site nem painel":"Lista vazia",children:i.jsx("span",{className:"text-2xl font-semibold tabular-nums",children:E})}),i.jsx(Ml,{label:"Dois fatores",icon:Ul,hint:t?.totpEnabled?"Pedido no login e em cada saque":"Sem ela, só a senha protege os saques",children:t?.totpEnabled?i.jsx(ze,{tone:"success",children:"ativo"}):i.jsx(ze,{tone:"danger",children:"desligado"})}),i.jsx(Ml,{label:"Endereço",icon:RC,hint:N,children:t?.pathKeyConfigured?P?i.jsx(ze,{tone:"warning",children:"vem do servidor"}):i.jsx(ze,{tone:"success",children:"definido aqui"}):i.jsx(ze,{tone:"warning",children:"sem endereço secreto"})})]}),i.jsxs(DP,{value:p,onValueChange:h,className:"space-y-5",children:[i.jsxs(Ib,{className:"flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-card-border bg-card p-1",children:[i.jsx(Qr,{value:"geral",className:Xg,children:"Visão geral"}),i.jsx(Qr,{value:"acesso",className:Xg,children:"Acesso"}),i.jsx(Qr,{value:"usuarios",className:Xg,children:"Usuários do Admin"}),i.jsxs(Qr,{value:"bloqueios",className:Xg,children:["Bloqueios",E>0&&i.jsx("span",{className:"ml-1.5 rounded bg-red-400/15 px-1.5 py-0.5 font-mono text-[0.62rem] text-red-400",children:E})]}),i.jsx(Qr,{value:"historico",className:Xg,children:"Histórico"})]}),i.jsxs(Xr,{value:"geral",className:"space-y-5",children:[i.jsx(x6e,{status:t,onGoToAccess:()=>h("acesso")}),i.jsx(qt,{title:i.jsxs("span",{className:"inline-flex items-center gap-2",children:[i.jsx(by,{size:12})," Dispositivos conectados"]}),subtitle:"Encerrar um acesso derruba aquele dispositivo na hora",bodyClassName:"p-0",actions:i.jsxs("button",{type:"button",onClick:()=>f.mutate(void 0,{onSuccess:w}),disabled:f.isPending,className:"inline-flex shrink-0 items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60",children:[f.isPending?i.jsx(De,{size:12,className:"animate-spin"}):i.jsx(J2,{size:12}),"Encerrar os outros"]}),children:r?i.jsxs("div",{className:"flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground",children:[i.jsx(De,{size:14,className:"animate-spin"})," Carregando acessos..."]}):v.length===0?i.jsx("p",{className:"px-5 py-8 text-center text-sm text-muted-foreground",children:"Nenhum acesso ativo."}):i.jsxs(i.Fragment,{children:[b.map(k=>i.jsx(y6e,{session:k,revoking:d.isPending,onRevoke:()=>d.mutate({id:k.id},{onSuccess:w})},k.id)),v.length>b.length&&i.jsxs("button",{type:"button",onClick:()=>x(!0),className:"w-full border-t border-card-border px-5 py-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground",children:["Mostrar os outros ",v.length-b.length," dispositivos"]})]})}),i.jsxs(TY,{title:"O que protege este painel",children:[i.jsxs("p",{children:["Três coisas: a ",i.jsx("strong",{className:"text-foreground/80",children:"senha"}),", o"," ",i.jsx("strong",{className:"text-foreground/80",children:"endereço secreto"})," e a"," ",i.jsx("strong",{className:"text-foreground/80",children:"autenticação de dois fatores"}),"."]}),i.jsxs("p",{children:["Senha e endereço começam valendo o que está no servidor (variáveis"," ",i.jsx(Ye,{className:"text-[0.7rem]",children:"DASH_PASSWORD"})," e"," ",i.jsx(Ye,{className:"text-[0.7rem]",children:"DASH_PATH_KEY"}),"). Se você trocar na aba Acesso, passa a valer o que foi definido aqui — o servidor deixa de mandar na senha."]})]}),i.jsx("div",{className:"flex justify-end",children:i.jsxs("button",{type:"button",onClick:Iv,className:qb,children:[i.jsx(J2,{size:12})," Sair deste dispositivo"]})})]}),i.jsxs(Xr,{value:"acesso",className:"space-y-5",children:[i.jsxs("div",{className:"grid gap-5 xl:grid-cols-2",children:[i.jsx(v6e,{fromEnv:T,onChanged:w}),i.jsx(b6e,{fromEnv:P,configured:t?.pathKeyConfigured??!1,currentUrl:N,urlKnown:C.length>0,onChanged:w})]}),i.jsx(A6e,{status:t,onChanged:w})]}),i.jsx(Xr,{value:"bloqueios",children:i.jsx(j6e,{data:l,isLoading:u})}),i.jsx(Xr,{value:"historico",children:i.jsx(S6e,{entries:O,isLoading:o})}),i.jsx(Xr,{value:"usuarios",children:i.jsx(AdminUsersTab,{})})]})]})}function A6e({status:e,onChanged:t}){const n=Ppe(),r=Dpe(),a=Bpe(),o=e?.totpEnabled??!1,[l,u]=S.useState(""),[d,f]=S.useState(""),[p,h]=S.useState(null),[y,x]=S.useState(null),[w,v]=S.useState(""),[b,O]=S.useState(null),[C,N]=S.useState(!1),[E,T]=S.useState(!1),P=B=>{O(null),u(""),f(""),h(B)},k=()=>{u(""),f(""),O(null),h(null)},_=B=>{B.preventDefault(),O(null),n.mutate({data:{currentPassword:l,...o?{code:d}:{}}},{onSuccess:V=>{x(V),h(null),u(""),f(""),N(!1),T(!1)},onError:V=>{u(""),f(""),O({ok:!1,message:Ll(V,"Não foi possível gerar a chave.")})}})},M=B=>{B.preventDefault(),O(null),r.mutate({data:{code:w.replace(/\D/g,"")}},{onSuccess:()=>{x(null),v(""),O({ok:!0,message:"Ativado. Agora o login, cada saque manual e o salvar integrações pedem o código."}),t()},onError:V=>{v(""),O({ok:!1,message:Ll(V,"Código incorreto.")})}})},L=B=>{B.preventDefault(),O(null),a.mutate({data:{currentPassword:l,code:d.replace(/\D/g,"")}},{onSuccess:()=>{u(""),f(""),h(null),O({ok:!0,message:"Desligado. Só a senha volta a proteger saques e integrações."}),t()},onError:V=>{u(""),f(""),O({ok:!1,message:Ll(V,"Não foi possível desligar a autenticação de dois fatores.")})}})},I=async()=>{if(y)try{await navigator.clipboard.writeText(y.pretty),N(!0)}catch{N(!1)}};return i.jsx(qt,{title:i.jsxs("span",{className:"inline-flex items-center gap-2",children:[i.jsx(Ul,{size:12})," Autenticação de dois fatores"]}),subtitle:"Código de 6 dígitos do app autenticador, pedido no login, em todo saque manual e ao salvar integrações",actions:o?i.jsxs(ze,{tone:"success",children:["ativo",e?.totpEnabledAt?` desde ${Ro(e.totpEnabledAt)}`:""]}):i.jsx(ze,{tone:"danger",children:"desligado"}),children:i.jsx("div",{className:"space-y-4",children:y?i.jsxs(i.Fragment,{children:[i.jsxs("div",{className:"rounded-lg border border-amber-400/30 bg-amber-400/[0.06] p-4",children:[i.jsx("p",{className:"text-xs font-semibold uppercase tracking-[0.14em] text-amber-300",children:"Guarde esta chave agora"}),i.jsx("p",{className:"mt-1.5 text-xs text-muted-foreground",children:"Aparece uma única vez. Salve no gerenciador de senhas ou no app autenticador (Google Authenticator, Authy, 1Password, Bitwarden)."}),i.jsx("div",{className:"mt-3 grid grid-cols-4 gap-1.5 rounded-md border border-card-border bg-background p-2.5",children:y.pretty.split(" ").map((B,V)=>i.jsx("span",{className:"rounded bg-white/5 py-1.5 text-center font-mono text-sm tracking-[0.18em] text-foreground",children:B},`${B}-${V}`))}),i.jsxs("div",{className:"mt-2.5 flex flex-wrap items-center gap-2",children:[i.jsx("button",{type:"button",onClick:I,className:"rounded-md border border-card-border bg-white/5 px-3 py-2 text-xs font-medium transition-colors hover:bg-white/10",children:C?"Copiado":"Copiar chave"}),i.jsx("button",{type:"button",onClick:()=>T(B=>!B),className:"rounded-md border border-card-border bg-white/5 px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-white/10",children:E?"Esconder link do app":"Link para o app autenticador"})]}),E&&i.jsx("p",{className:"mt-2 break-all font-mono text-[0.65rem] text-muted-foreground",children:y.uri})]}),i.jsxs("form",{onSubmit:M,className:"space-y-3 sm:max-w-xs",children:[i.jsx(Uz,{label:"Código atual do aplicativo",value:w,onChange:v,className:"text-center text-lg tracking-[0.4em]"}),b&&i.jsx(Su,{feedback:b}),i.jsxs("div",{className:"flex flex-wrap justify-end gap-2",children:[i.jsx("button",{type:"button",onClick:()=>{x(null),v(""),O(null)},className:"rounded-md border border-card-border bg-white/5 px-3.5 py-2 text-xs font-medium transition-colors hover:bg-white/10",children:"Cancelar"}),i.jsxs("button",{type:"submit",disabled:r.isPending||w.length!==6,className:"inline-flex items-center gap-2 rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50",children:[r.isPending?i.jsx(De,{size:13,className:"animate-spin"}):i.jsx(an,{size:13}),"Ativar dois fatores"]})]})]})]}):i.jsxs(i.Fragment,{children:[i.jsx("p",{className:"text-xs text-muted-foreground",children:o?"Ativo. Cada código vale uma única vez — se acabou de usar um, espere o próximo (30 segundos).":"Sem ela, quem descobrir a senha saca. Com ela, precisa também do app autenticador."}),p===null?i.jsxs(i.Fragment,{children:[b&&i.jsx(Su,{feedback:b}),i.jsxs("div",{className:"flex flex-wrap justify-end gap-2",children:[o&&i.jsx("button",{type:"button",onClick:()=>P("disable"),className:"rounded-md border border-red-400/40 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/20",children:"Desligar dois fatores"}),i.jsx("button",{type:"button",onClick:()=>P("setup"),className:wh,children:o?"Gerar chave nova":"Configurar dois fatores"})]})]}):i.jsxs("form",{onSubmit:B=>{B.preventDefault(),p==="disable"?L(B):_(B)},className:"space-y-3",children:[i.jsx("p",{className:"text-xs text-foreground/80",children:p==="disable"?"Confirme com a senha do painel e o código do aplicativo para desligar.":o?"Confirme com a senha do painel e o código atual para gerar uma chave nova.":"Confirme com a senha do painel para gerar a chave."}),i.jsxs("div",{className:"grid gap-3 sm:max-w-md sm:grid-cols-2",children:[i.jsx(hm,{label:"Senha do painel",autoComplete:"current-password",value:l,onChange:u}),o&&i.jsx(Uz,{label:"Código atual",value:d,onChange:f})]}),b&&i.jsx(Su,{feedback:b}),i.jsxs("div",{className:"flex flex-wrap justify-end gap-2",children:[i.jsx("button",{type:"button",onClick:k,className:"rounded-md border border-card-border bg-white/5 px-3.5 py-2 text-xs font-medium transition-colors hover:bg-white/10",children:"Cancelar"}),p==="disable"?i.jsxs("button",{type:"submit",disabled:a.isPending||l.length===0||d.length!==6,className:"inline-flex items-center gap-2 rounded-md border border-red-400/40 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50",children:[a.isPending&&i.jsx(De,{size:13,className:"animate-spin"}),a.isPending?"Desligando...":"Confirmar desligamento"]}):i.jsxs("button",{type:"submit",disabled:n.isPending||l.length===0||o&&d.length!==6,className:wh,children:[n.isPending&&i.jsx(De,{size:13,className:"animate-spin"}),o?"Gerar chave nova":"Configurar dois fatores"]})]})]})]})})})}function yi({section:e}){const t=jC();let n;switch(e){case"users":n=i.jsx(OIe,{});break;case"user-detail":n=i.jsx(_Ie,{userId:t.id??""});break;case"products":n=i.jsx(tqe,{});break;case"integrations":n=i.jsx(rqe,{});break;case"gateway":n=i.jsx(Eqe,{});break;case"payzu":n=i.jsx(p6e,{});break;case"push":n=i.jsx(n6e,{});break;case"cpf-test":n=i.jsx(a6e,{});break;case"security":n=i.jsx(N6e,{});break;default:n=i.jsx(dIe,{})}return i.jsx(Zxe,{section:e,children:n})}function O6e({children:e,pathKey:t}){
-  const n=ta(),
-  [r,a]=S.useState(()=>M9()?"checking":"locked"),
-  [usr,setUsr]=S.useState(""),
-  [o,l]=S.useState(""),
-  [u,d]=S.useState(""),
-  [f,p]=S.useState(!1),
-  [h,y]=S.useState(!1),
-  [x,w]=S.useState(""),
-  [v,b]=S.useState(!1);
-
-  S.useEffect(()=>(document.documentElement.classList.add("dash-screen"),()=>document.documentElement.classList.remove("dash-screen")),[]);
-  S.useEffect(()=>{if(r!=="checking")return;let N=!0;return tpe().then(()=>{N&&a("unlocked")}).catch(()=>{N&&(Iv(),a("locked"))}),()=>{N=!1}},[r]);
-  S.useEffect(()=>Yxe(N=>{N||a("locked")}),[]);
-
-  const O=async N=>{
-    if(N.preventDefault(),!v){
-      b(!0),w("");
-      try{
-        const E=await Jhe({username:usr.trim(),password:o,pathKey:t,...u?{code:u}:{}});
-        Wxe(E.token),_9(t),l(""),d(""),p(!1),await n.invalidateQueries(),a("unlocked")
-      }catch(E){
-        const T=E instanceof IA?E.data:null,P=E instanceof IA?T?.error??"Não foi possível entrar.":"Falha de conexão com o servidor.";
-        w(P),d(""),T?.totpRequired?p(!0):(p(!1),l(""))
-      }finally{
-        b(!1)
-      }
-    }
-  };
-
-  const C=N=>i.jsx("div",{className:"dark dash-theme min-h-screen bg-[#070d0a] font-sans text-foreground antialiased selection:bg-emerald-500 selection:text-black",children:N});
-
-  return C(r==="checking"?i.jsx("div",{className:"flex min-h-screen items-center justify-center bg-[#070d0a]",children:i.jsx(De,{size:24,className:"animate-spin text-emerald-400"})}):r==="unlocked"?e:i.jsxs("div",{className:"relative flex min-h-screen items-center justify-center px-4 py-8 overflow-hidden bg-[#070d0a]",children:[
-    i.jsx("div",{className:"pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-transparent blur-3xl rounded-full"}),
-    i.jsx("div",{className:"pointer-events-none absolute inset-0 opacity-[0.18]",style:{backgroundImage:"radial-gradient(rgba(52,211,153,0.3) 1px, transparent 1px)",backgroundSize:"28px 28px"}}),
-    i.jsxs("form",{onSubmit:O,className:"relative w-full max-w-[420px] rounded-2xl border border-emerald-500/20 bg-[#0d1612]/90 backdrop-blur-2xl p-7 sm:p-9 shadow-[0_25px_60px_rgba(0,0,0,0.85),0_0_40px_rgba(16,185,129,0.08)]",children:[
-      i.jsxs("div",{className:"mb-7 flex items-center justify-between",children:[
-        i.jsxs("div",{className:"flex items-center gap-3",children:[
-          i.jsx("div",{className:"flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-lime-500 text-zinc-950 font-black shadow-[0_0_20px_rgba(52,211,153,0.4)]",children:i.jsx(Mn,{size:20,strokeWidth:2.2})}),
-          i.jsxs("div",{children:[
-            i.jsx("div",{className:"text-base font-bold text-white tracking-tight leading-none",children:"Valore Brasil"}),
-            i.jsx("div",{className:"mt-1 font-mono text-[0.62rem] uppercase tracking-[0.22em] text-emerald-400 font-semibold",children:"Painel Administrativo"})
-          ]})
-        ]}),
-        i.jsx("span",{className:"rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[0.62rem] font-bold text-emerald-400 tracking-wider",children:"PROD"})
-      ]}),
-      i.jsxs("div",{className:"mb-4",children:[
-        i.jsx("label",{className:"mb-1.5 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-white/60 font-medium",children:"Usuário"}),
-        i.jsx("input",{type:"text",value:usr,onChange:N=>{setUsr(N.target.value),w("")},placeholder:"admin ou seu usuário",className:"w-full rounded-lg border border-white/10 bg-white/[0.04] py-2.5 px-3.5 text-sm text-white outline-none transition-all placeholder:text-white/20 focus:border-emerald-500/60 focus:bg-white/[0.06] focus:ring-2 focus:ring-emerald-500/20"})
-      ]}),
-      i.jsx("label",{className:"mb-1.5 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-white/60 font-medium",children:"Senha de Acesso"}),
-      i.jsxs("div",{className:"relative",children:[
-        i.jsx("input",{type:h?"text":"password",autoFocus:!0,autoComplete:"current-password",value:o,onChange:N=>{l(N.target.value),w("")},placeholder:"••••••••",className:"w-full rounded-lg border border-white/10 bg-white/[0.04] py-2.5 pl-3.5 pr-11 text-sm text-white outline-none transition-all placeholder:text-white/20 focus:border-emerald-500/60 focus:bg-white/[0.06] focus:ring-2 focus:ring-emerald-500/20"}),
-        i.jsx("button",{type:"button",onClick:()=>y(N=>!N),"aria-label":h?"Ocultar senha":"Ver senha",className:"absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors",children:h?i.jsx(lv,{size:15}):i.jsx(cv,{size:15})})
-      ]}),
-      f&&i.jsxs("div",{className:"mt-4",children:[
-        i.jsx("label",{className:"mb-1.5 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-white/60",children:"Código do autenticador"}),
-        i.jsx("input",{inputMode:"numeric",autoFocus:!0,autoComplete:"one-time-code",maxLength:6,value:u,onChange:N=>{d(N.target.value.replace(/\D/g,"").slice(0,6)),w("")},placeholder:"000000",className:"w-full rounded-lg border border-white/10 bg-white/[0.04] py-2.5 text-center font-mono text-lg tracking-[0.4em] text-white outline-none transition-all placeholder:tracking-[0.4em] placeholder:text-white/20 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20"})
-      ]}),
-      x&&i.jsxs("p",{className:"mt-3 flex items-start gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400 font-medium",children:[i.jsx(ey,{size:14,className:"mt-0.5 shrink-0"}),x]}),
-      i.jsxs("button",{type:"submit",disabled:v||o.length===0||f&&u.length!==6,className:"mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 via-lime-400 to-emerald-400 py-3 text-sm font-bold text-zinc-950 transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none shadow-[0_0_25px_rgba(52,211,153,0.3)]",children:[
-        v&&i.jsx(De,{size:15,className:"animate-spin text-zinc-950"}),
-        v?"Verificando Acesso...":"Entrar no Painel"
-      ]}),
-      i.jsxs("div",{className:"mt-6 flex items-center justify-center gap-1.5 text-center font-mono text-[0.62rem] text-white/40 uppercase tracking-wide",children:[
-        i.jsx(Mn,{size:11,className:"text-emerald-400"}),
-        "Ambiente Protegido · TLS 1.3 & Supabase"
-      ]})
-    ]})
-  ]}))}
+function N6e(){const e=ta(),{data:t}=nE(),{data:n,isLoading:r}=spe(),{data:a,isLoading:o}=Fpe({limit:100}),{data:l,isLoading:u}=Kpe({query:{queryKey:Rv(),refetchInterval:6e4}}),d=ppe(),f=dpe(),[p,h]=S.useState("geral"),[y,x]=S.useState(!1),w=()=>{e.invalidateQueries({queryKey:p9()}),e.invalidateQueries({queryKey:g9()}),e.invalidateQueries({queryKey:rE({limit:100})})},v=n??[],b=y?v:v.slice(0,6),O=a??[],C=t?.pathKey??"",N=`${window.location.origin}/p/${C||Gxe()}`,E=(l?.items??[]).filter(k=>k.active).length,T=t?.passwordFromEnv??!1,P=t?.pathKeyFromEnv??!1;return i.jsxs("div",{className:"space-y-5",children:[i.jsxs("div",{className:"grid gap-4 grid-cols-2 xl:grid-cols-4",children:[i.jsx(Ml,{label:"Acessos ativos",icon:by,hint:"Dispositivos conectados",children:i.jsx("span",{className:"text-2xl font-semibold tabular-nums",children:t?.activeSessions??"—"})}),i.jsx(Ml,{label:"Bloqueados",icon:Ci,hint:E>0?"Não abrem site nem painel":"Lista vazia",children:i.jsx("span",{className:"text-2xl font-semibold tabular-nums",children:E})}),i.jsx(Ml,{label:"Dois fatores",icon:Ul,hint:t?.totpEnabled?"Pedido no login e em cada saque":"Sem ela, só a senha protege os saques",children:t?.totpEnabled?i.jsx(ze,{tone:"success",children:"ativo"}):i.jsx(ze,{tone:"danger",children:"desligado"})}),i.jsx(Ml,{label:"Endereço",icon:RC,hint:N,children:t?.pathKeyConfigured?P?i.jsx(ze,{tone:"warning",children:"vem do servidor"}):i.jsx(ze,{tone:"success",children:"definido aqui"}):i.jsx(ze,{tone:"warning",children:"sem endereço secreto"})})]}),i.jsxs(DP,{value:p,onValueChange:h,className:"space-y-5",children:[i.jsxs(Ib,{className:"flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-card-border bg-card p-1",children:[i.jsx(Qr,{value:"geral",className:Xg,children:"Visão geral"}),i.jsx(Qr,{value:"acesso",className:Xg,children:"Acesso"}),i.jsx(Qr,{value:"usuarios",className:Xg,children:"Usuários do Admin"}),i.jsxs(Qr,{value:"bloqueios",className:Xg,children:["Bloqueios",E>0&&i.jsx("span",{className:"ml-1.5 rounded bg-red-400/15 px-1.5 py-0.5 font-mono text-[0.62rem] text-red-400",children:E})]}),i.jsx(Qr,{value:"historico",className:Xg,children:"Histórico"})]}),i.jsxs(Xr,{value:"geral",className:"space-y-5",children:[i.jsx(x6e,{status:t,onGoToAccess:()=>h("acesso")}),i.jsx(qt,{title:i.jsxs("span",{className:"inline-flex items-center gap-2",children:[i.jsx(by,{size:12})," Dispositivos conectados"]}),subtitle:"Encerrar um acesso derruba aquele dispositivo na hora",bodyClassName:"p-0",actions:i.jsxs("button",{type:"button",onClick:()=>f.mutate(void 0,{onSuccess:w}),disabled:f.isPending,className:"inline-flex shrink-0 items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60",children:[f.isPending?i.jsx(De,{size:12,className:"animate-spin"}):i.jsx(J2,{size:12}),"Encerrar os outros"]}),children:r?i.jsxs("div",{className:"flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground",children:[i.jsx(De,{size:14,className:"animate-spin"})," Carregando acessos..."]}):v.length===0?i.jsx("p",{className:"px-5 py-8 text-center text-sm text-muted-foreground",children:"Nenhum acesso ativo."}):i.jsxs(i.Fragment,{children:[b.map(k=>i.jsx(y6e,{session:k,revoking:d.isPending,onRevoke:()=>d.mutate({id:k.id},{onSuccess:w})},k.id)),v.length>b.length&&i.jsxs("button",{type:"button",onClick:()=>x(!0),className:"w-full border-t border-card-border px-5 py-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground",children:["Mostrar os outros ",v.length-b.length," dispositivos"]})]})}),i.jsxs(TY,{title:"O que protege este painel",children:[i.jsxs("p",{children:["Três coisas: a ",i.jsx("strong",{className:"text-foreground/80",children:"senha"}),", o"," ",i.jsx("strong",{className:"text-foreground/80",children:"endereço secreto"})," e a"," ",i.jsx("strong",{className:"text-foreground/80",children:"autenticação de dois fatores"}),"."]}),i.jsxs("p",{children:["Senha e endereço começam valendo o que está no servidor (variáveis"," ",i.jsx(Ye,{className:"text-[0.7rem]",children:"DASH_PASSWORD"})," e"," ",i.jsx(Ye,{className:"text-[0.7rem]",children:"DASH_PATH_KEY"}),"). Se você trocar na aba Acesso, passa a valer o que foi definido aqui — o servidor deixa de mandar na senha."]})]}),i.jsx("div",{className:"flex justify-end",children:i.jsxs("button",{type:"button",onClick:Iv,className:qb,children:[i.jsx(J2,{size:12})," Sair deste dispositivo"]})})]}),i.jsxs(Xr,{value:"acesso",className:"space-y-5",children:[i.jsxs("div",{className:"grid gap-5 xl:grid-cols-2",children:[i.jsx(v6e,{fromEnv:T,onChanged:w}),i.jsx(b6e,{fromEnv:P,configured:t?.pathKeyConfigured??!1,currentUrl:N,urlKnown:C.length>0,onChanged:w})]}),i.jsx(A6e,{status:t,onChanged:w})]}),i.jsx(Xr,{value:"bloqueios",children:i.jsx(j6e,{data:l,isLoading:u})}),i.jsx(Xr,{value:"historico",children:i.jsx(S6e,{entries:O,isLoading:o})}),i.jsx(Xr,{value:"usuarios",children:i.jsx(AdminUsersTab,{})})]})]})}function A6e({status:e,onChanged:t}){const n=Ppe(),r=Dpe(),a=Bpe(),o=e?.totpEnabled??!1,[l,u]=S.useState(""),[d,f]=S.useState(""),[p,h]=S.useState(null),[y,x]=S.useState(null),[w,v]=S.useState(""),[b,O]=S.useState(null),[C,N]=S.useState(!1),[E,T]=S.useState(!1),P=B=>{O(null),u(""),f(""),h(B)},k=()=>{u(""),f(""),O(null),h(null)},_=B=>{B.preventDefault(),O(null),n.mutate({data:{currentPassword:l,...o?{code:d}:{}}},{onSuccess:V=>{x(V),h(null),u(""),f(""),N(!1),T(!1)},onError:V=>{u(""),f(""),O({ok:!1,message:Ll(V,"Não foi possível gerar a chave.")})}})},M=B=>{B.preventDefault(),O(null),r.mutate({data:{code:w.replace(/\D/g,"")}},{onSuccess:()=>{x(null),v(""),O({ok:!0,message:"Ativado. Agora o login, cada saque manual e o salvar integrações pedem o código."}),t()},onError:V=>{v(""),O({ok:!1,message:Ll(V,"Código incorreto.")})}})},L=B=>{B.preventDefault(),O(null),a.mutate({data:{currentPassword:l,code:d.replace(/\D/g,"")}},{onSuccess:()=>{u(""),f(""),h(null),O({ok:!0,message:"Desligado. Só a senha volta a proteger saques e integrações."}),t()},onError:V=>{u(""),f(""),O({ok:!1,message:Ll(V,"Não foi possível desligar a autenticação de dois fatores.")})}})},I=async()=>{if(y)try{await navigator.clipboard.writeText(y.pretty),N(!0)}catch{N(!1)}};return i.jsx(qt,{title:i.jsxs("span",{className:"inline-flex items-center gap-2",children:[i.jsx(Ul,{size:12})," Autenticação de dois fatores"]}),subtitle:"Código de 6 dígitos do app autenticador, pedido no login, em todo saque manual e ao salvar integrações",actions:o?i.jsxs(ze,{tone:"success",children:["ativo",e?.totpEnabledAt?` desde ${Ro(e.totpEnabledAt)}`:""]}):i.jsx(ze,{tone:"danger",children:"desligado"}),children:i.jsx("div",{className:"space-y-4",children:y?i.jsxs(i.Fragment,{children:[i.jsxs("div",{className:"rounded-lg border border-amber-400/30 bg-amber-400/[0.06] p-4",children:[i.jsx("p",{className:"text-xs font-semibold uppercase tracking-[0.14em] text-amber-300",children:"Guarde esta chave agora"}),i.jsx("p",{className:"mt-1.5 text-xs text-muted-foreground",children:"Aparece uma única vez. Salve no gerenciador de senhas ou no app autenticador (Google Authenticator, Authy, 1Password, Bitwarden)."}),i.jsx("div",{className:"mt-3 grid grid-cols-4 gap-1.5 rounded-md border border-card-border bg-background p-2.5",children:y.pretty.split(" ").map((B,V)=>i.jsx("span",{className:"rounded bg-white/5 py-1.5 text-center font-mono text-sm tracking-[0.18em] text-foreground",children:B},`${B}-${V}`))}),i.jsxs("div",{className:"mt-2.5 flex flex-wrap items-center gap-2",children:[i.jsx("button",{type:"button",onClick:I,className:"rounded-md border border-card-border bg-white/5 px-3 py-2 text-xs font-medium transition-colors hover:bg-white/10",children:C?"Copiado":"Copiar chave"}),i.jsx("button",{type:"button",onClick:()=>T(B=>!B),className:"rounded-md border border-card-border bg-white/5 px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-white/10",children:E?"Esconder link do app":"Link para o app autenticador"})]}),E&&i.jsx("p",{className:"mt-2 break-all font-mono text-[0.65rem] text-muted-foreground",children:y.uri})]}),i.jsxs("form",{onSubmit:M,className:"space-y-3 sm:max-w-xs",children:[i.jsx(Uz,{label:"Código atual do aplicativo",value:w,onChange:v,className:"text-center text-lg tracking-[0.4em]"}),b&&i.jsx(Su,{feedback:b}),i.jsxs("div",{className:"flex flex-wrap justify-end gap-2",children:[i.jsx("button",{type:"button",onClick:()=>{x(null),v(""),O(null)},className:"rounded-md border border-card-border bg-white/5 px-3.5 py-2 text-xs font-medium transition-colors hover:bg-white/10",children:"Cancelar"}),i.jsxs("button",{type:"submit",disabled:r.isPending||w.length!==6,className:"inline-flex items-center gap-2 rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50",children:[r.isPending?i.jsx(De,{size:13,className:"animate-spin"}):i.jsx(an,{size:13}),"Ativar dois fatores"]})]})]})]}):i.jsxs(i.Fragment,{children:[i.jsx("p",{className:"text-xs text-muted-foreground",children:o?"Ativo. Cada código vale uma única vez — se acabou de usar um, espere o próximo (30 segundos).":"Sem ela, quem descobrir a senha saca. Com ela, precisa também do app autenticador."}),p===null?i.jsxs(i.Fragment,{children:[b&&i.jsx(Su,{feedback:b}),i.jsxs("div",{className:"flex flex-wrap justify-end gap-2",children:[o&&i.jsx("button",{type:"button",onClick:()=>P("disable"),className:"rounded-md border border-red-400/40 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/20",children:"Desligar dois fatores"}),i.jsx("button",{type:"button",onClick:()=>P("setup"),className:wh,children:o?"Gerar chave nova":"Configurar dois fatores"})]})]}):i.jsxs("form",{onSubmit:B=>{B.preventDefault(),p==="disable"?L(B):_(B)},className:"space-y-3",children:[i.jsx("p",{className:"text-xs text-foreground/80",children:p==="disable"?"Confirme com a senha do painel e o código do aplicativo para desligar.":o?"Confirme com a senha do painel e o código atual para gerar uma chave nova.":"Confirme com a senha do painel para gerar a chave."}),i.jsxs("div",{className:"grid gap-3 sm:max-w-md sm:grid-cols-2",children:[i.jsx(hm,{label:"Senha do painel",autoComplete:"current-password",value:l,onChange:u}),o&&i.jsx(Uz,{label:"Código atual",value:d,onChange:f})]}),b&&i.jsx(Su,{feedback:b}),i.jsxs("div",{className:"flex flex-wrap justify-end gap-2",children:[i.jsx("button",{type:"button",onClick:k,className:"rounded-md border border-card-border bg-white/5 px-3.5 py-2 text-xs font-medium transition-colors hover:bg-white/10",children:"Cancelar"}),p==="disable"?i.jsxs("button",{type:"submit",disabled:a.isPending||l.length===0||d.length!==6,className:"inline-flex items-center gap-2 rounded-md border border-red-400/40 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50",children:[a.isPending&&i.jsx(De,{size:13,className:"animate-spin"}),a.isPending?"Desligando...":"Confirmar desligamento"]}):i.jsxs("button",{type:"submit",disabled:n.isPending||l.length===0||o&&d.length!==6,className:wh,children:[n.isPending&&i.jsx(De,{size:13,className:"animate-spin"}),o?"Gerar chave nova":"Configurar dois fatores"]})]})]})]})})})}function yi({section:e}){const t=jC();let n;switch(e){case"users":n=i.jsx(OIe,{});break;case"user-detail":n=i.jsx(_Ie,{userId:t.id??""});break;case"products":n=i.jsx(tqe,{});break;case"integrations":n=i.jsx(rqe,{});break;case"gateway":n=i.jsx(Eqe,{});break;case"payzu":n=i.jsx(p6e,{});break;case"push":n=i.jsx(n6e,{});break;case"cpf-test":n=i.jsx(a6e,{});break;case"security":n=i.jsx(N6e,{});break;default:n=i.jsx(dIe,{})}return i.jsx(Zxe,{section:e,children:n})}function O6e({children:e,pathKey:t}){const n=ta(),[r,a]=S.useState(()=>M9()?"checking":"locked"),[usr,setUsr]=S.useState(""),[o,l]=S.useState(""),[u,d]=S.useState(""),[f,p]=S.useState(!1),[h,y]=S.useState(!1),[x,w]=S.useState(""),[v,b]=S.useState(!1);S.useEffect(()=>(document.documentElement.classList.add("dash-screen"),()=>document.documentElement.classList.remove("dash-screen")),[]),S.useEffect(()=>{if(r!=="checking")return;let N=!0;return tpe().then(()=>{N&&a("unlocked")}).catch(()=>{N&&(Iv(),a("locked"))}),()=>{N=!1}},[r]),S.useEffect(()=>Yxe(N=>{N||a("locked")}),[]);const O=async N=>{if(N.preventDefault(),!v){b(!0),w("");try{const E=await Jhe({username:usr.trim(),password:o,pathKey:t,...u?{code:u}:{}});Wxe(E.token),_9(t),l(""),d(""),p(!1),await n.invalidateQueries(),a("unlocked")}catch(E){const T=E instanceof IA?E.data:null,P=E instanceof IA?T?.error??"Não foi possível entrar.":"Falha de conexão com o servidor.";w(P),d(""),T?.totpRequired?p(!0):(p(!1),l(""))}finally{b(!1)}}},C=N=>i.jsx("div",{className:"dark dash-theme min-h-screen bg-background font-sans text-foreground antialiased",children:N});return C(r==="checking"?i.jsx("div",{className:"flex min-h-screen items-center justify-center",children:i.jsx(De,{size:20,className:"animate-spin text-muted-foreground"})}):r==="unlocked"?e:i.jsxs("div",{className:"relative flex min-h-screen items-center justify-center px-6",children:[i.jsx("div",{className:"pointer-events-none absolute inset-0 opacity-60",style:{backgroundImage:"radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)",backgroundSize:"28px 28px",maskImage:"radial-gradient(ellipse at center, black, transparent 70%)"}}),i.jsxs("form",{onSubmit:O,className:"relative w-full max-w-sm rounded-lg border border-card-border bg-card p-8",children:[i.jsxs("div",{className:"mb-7 flex items-center gap-3",children:[i.jsx("div",{className:"flex h-10 w-10 items-center justify-center rounded-md bg-foreground text-background",children:i.jsx(Mn,{size:16,strokeWidth:2})}),i.jsxs("div",{children:[i.jsx("div",{className:"text-sm font-semibold leading-tight",children:"Valore"}),i.jsx("div",{className:"mt-0.5 font-mono text-[0.62rem] uppercase tracking-[0.22em] text-muted-foreground",children:"painel admin"})]})]}),i.jsxs("div",{className:"mb-4",children:[i.jsx("label",{className:"mb-1.5 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground",children:"Usuário"}),i.jsx("input",{type:"text",value:usr,onChange:N=>{setUsr(N.target.value),w("")},placeholder:"admin",className:"w-full rounded-md border border-input bg-background py-2.5 px-3.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/35 focus:border-white/40 focus:ring-2 focus:ring-white/10"})]}),i.jsx("label",{className:"mb-1.5 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground",children:"Senha de acesso"}),i.jsxs("div",{className:"relative",children:[i.jsx("input",{type:h?"text":"password",autoFocus:!0,autoComplete:"current-password",value:o,onChange:N=>{l(N.target.value),w("")},placeholder:"••••••••",className:"w-full rounded-md border border-input bg-background py-2.5 pl-3.5 pr-11 text-sm outline-none transition-colors placeholder:text-muted-foreground/35 focus:border-white/40 focus:ring-2 focus:ring-white/10"}),i.jsx("button",{type:"button",onClick:()=>y(N=>!N),"aria-label":h?"Ocultar senha":"Mostrar senha",className:"absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground",children:h?i.jsx(lv,{size:15}):i.jsx(cv,{size:15})})]}),f&&i.jsxs("div",{className:"mt-4",children:[i.jsx("label",{className:"mb-1.5 block font-mono text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground",children:"Código do autenticador"}),i.jsx("input",{inputMode:"numeric",autoFocus:!0,autoComplete:"one-time-code",maxLength:6,value:u,onChange:N=>{d(N.target.value.replace(/\D/g,"").slice(0,6)),w("")},placeholder:"000000",className:"w-full rounded-md border border-input bg-background py-2.5 text-center font-mono text-lg tracking-[0.4em] outline-none transition-colors placeholder:tracking-[0.4em] placeholder:text-muted-foreground/35 focus:border-white/40 focus:ring-2 focus:ring-white/10"})]}),x&&i.jsxs("p",{className:"mt-2 flex items-start gap-1.5 text-xs text-foreground",children:[i.jsx(ey,{size:13,className:"mt-0.5 shrink-0"}),x]}),i.jsxs("button",{type:"submit",disabled:v||o.length===0||f&&u.length!==6,className:"mt-5 flex w-full items-center justify-center gap-2 rounded-md bg-foreground py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50",children:[v&&i.jsx(De,{size:14,className:"animate-spin"}),"Entrar"]}),i.jsx("p",{className:"mt-6 text-center font-mono text-[0.62rem] uppercase tracking-wide leading-relaxed text-muted-foreground/70",children:"Acesso restrito · sessão registrada"})]})]}))}
 
 function Vz(e){e?.status===401&&(Iv(),EY.clear())}const EY=new qZ({queryCache:new m$({onError:Vz}),mutationCache:new f$({onError:Vz})});function C6e(){const[e]=tc();return S.useEffect(()=>{window.scrollTo(0,0)},[e]),null}const T6e="Empréstimo online com simulação gratuita",E6e="Painel Valore",P6e="/p/";function PY(e){return e.startsWith(P6e)}function k6e(){const[e]=tc();return S.useEffect(()=>{typeof window<"u"&&typeof window.updateValoreSeo=="function"?window.updateValoreSeo(e):document.title=PY(e)?E6e:T6e},[e]),null}function M6e({pathKey:e}){return i.jsx(O6e,{pathKey:e,children:i.jsxs(r$,{children:[i.jsx(pn,{path:"/",children:i.jsx(yi,{section:"dashboard"})}),i.jsx(pn,{path:"/usuarios",children:i.jsx(yi,{section:"users"})}),i.jsx(pn,{path:"/usuarios/:id",children:i.jsx(yi,{section:"user-detail"})}),i.jsx(pn,{path:"/produtos",children:i.jsx(yi,{section:"products"})}),i.jsx(pn,{path:"/push",children:i.jsx(yi,{section:"push"})}),i.jsx(pn,{path:"/integracoes",children:i.jsx(yi,{section:"integrations"})}),i.jsx(pn,{path:"/gateway",children:i.jsx(yi,{section:"gateway"})}),i.jsx(pn,{path:"/payzu",children:i.jsx(yi,{section:"payzu"})}),i.jsx(pn,{path:"/consulta-cpf",children:i.jsx(yi,{section:"cpf-test"})}),i.jsx(pn,{path:"/seguranca",children:i.jsx(yi,{section:"security"})}),i.jsx(pn,{component:o8})]})})}function Hz(){return i.jsxs(r$,{children:[i.jsx(pn,{path:"/",component:Ude}),Si.map(e=>i.jsx(pn,{path:`/${e}`,children:i.jsx(Rxe,{step:e})},e)),i.jsx(pn,{path:"/conta",children:i.jsx(Rxe,{step:"contrato"})}),i.jsx(pn,{path:"/privacidade",component:Ixe}),i.jsx(pn,{path:"/termos",component:qxe}),i.jsx(pn,{path:"/recuperar/:id",component:Fxe}),i.jsx(pn,{path:"/retomar",component:Hxe}),i.jsx(pn,{path:"/ativar-push",component:Kxe}),i.jsx(pn,{path:"/p/:key",nest:!0,children:e=>i.jsx(M6e,{pathKey:e.key})}),i.jsx(pn,{component:o8})]})}function _6e(){const[e]=tc();return PY(e)?i.jsx(Hz,{}):i.jsx("div",{className:"app-compact",children:i.jsx(Hz,{})})}function D6e(){return i.jsx(BZ,{client:EY,children:i.jsxs(vie,{children:[i.jsxs(t$,{base:"/".replace(/\/$/,""),children:[i.jsx(C6e,{}),i.jsx(k6e,{}),i.jsx(Lie,{children:i.jsx(_6e,{})})]}),i.jsx(zre,{})]})})}WX.createRoot(document.getElementById("root")).render(i.jsx(D6e,{}));k7();
