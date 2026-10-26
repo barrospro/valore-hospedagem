@@ -712,6 +712,7 @@ async function handleApi(req, res, url) {
         offerFunnelAbandons: s.funnelAbandons,
         offerMidFunnelAbandonRate: s.midFunnelAbandonRate,
         offerCheckoutAbandonRate: s.checkoutAbandonRate,
+        offerAbandonRanking: s.abandonRanking || [],
       },
       offer: {
         totalRevenue: s.totalRevenue,
