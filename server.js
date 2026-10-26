@@ -960,6 +960,15 @@ async function handleApi(req, res, url) {
     }
   }
 
+  if (pathname === '/api/utmify-test' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    const customToken = body.token || body.config?.token;
+    const result = await utmify.testConnection(customToken);
+    return sendJson(req, res, 200, result);
+  }
+
   if (pathname === '/api/gateway-test' && method === 'POST') {
     const t0 = Date.now();
     const token = admin.extractToken(req);

@@ -2099,16 +2099,28 @@ function rqe() {
     setApiValidationResult(null);
     try {
       const hdrs = await getAuthHeaders();
-      const resp = await fetch("/api/gateway-test", {
-        method: "POST",
-        headers: hdrs,
-        body: JSON.stringify({
-          gatewayId: N.id,
-          provider: N.provider || N.id,
-          config: E
-        })
-      });
-      const data = await resp.json();
+      const isUtmifyTarget = N.id === "utmify";
+      let resp, data;
+      if (isUtmifyTarget) {
+        resp = await fetch("/api/utmify-test", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({
+            token: (E?.token ?? "").trim()
+          })
+        });
+      } else {
+        resp = await fetch("/api/gateway-test", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({
+            gatewayId: N.id,
+            provider: N.provider || N.id,
+            config: E
+          })
+        });
+      }
+      data = await resp.json();
       if (!resp.ok && data?.error) {
         setApiValidationResult({
           ok: false,
@@ -2291,6 +2303,7 @@ function rqe() {
 
   const L = N.icon;
   const isGw = N.group === "gateway";
+  const isUtmify = N.id === "utmify";
   const currentWebhookUrl = N.webhookUrl || ("https://www.valorebrasil.app/api/webhooks/" + (N.provider || N.id));
   const currentWebhookActive = webhookActiveMap[N.id] ?? (N.webhookActive !== false);
   const addSpec = PROVIDER_SPECS[newGwProvider] || PROVIDER_SPECS.nitropay;
@@ -2487,14 +2500,14 @@ function rqe() {
                           ]
                         }),
 
-                        isGw && i.jsxs("button", {
+                        (isGw || isUtmify) && i.jsxs("button", {
                           type: "button",
                           onClick: handleValidateApi,
                           disabled: isValidatingApi,
                           className: "inline-flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-all disabled:opacity-50 cursor-pointer",
                           children: [
                             isValidatingApi ? i.jsx(De, { size: 13, className: "animate-spin" }) : i.jsx("span", { className: "text-base leading-none", children: "⚡" }),
-                            isValidatingApi ? "Validando API..." : "Validar API / Testar Conexão"
+                            isValidatingApi ? (isUtmify ? "Validando UTMify..." : "Validando API...") : (isUtmify ? "Validar API UTMify" : "Validar API / Testar Conexão")
                           ]
                         }),
 
@@ -2525,7 +2538,7 @@ function rqe() {
                           i.jsxs("span", {
                             className: "flex items-center gap-2",
                             children: [
-                              apiValidationResult.ok ? "✓ API Conectada & Operacional" : "✕ Falha na Comunicação com o Gateway",
+                              apiValidationResult.ok ? (isUtmify ? "✓ API UTMify Conectada & Operacional" : "✓ API Conectada & Operacional") : (isUtmify ? "✕ Falha na Comunicação com a UTMify" : "✕ Falha na Comunicação com o Gateway"),
                               apiValidationResult.elapsedMs && i.jsx("span", { className: "text-[11px] opacity-75 font-mono", children: "(" + apiValidationResult.elapsedMs + "ms)" })
                             ]
                           }),
@@ -2540,14 +2553,14 @@ function rqe() {
                       apiValidationResult.ok ? i.jsxs("div", {
                         className: "space-y-1 text-emerald-300/90",
                         children: [
-                          i.jsx("p", { children: apiValidationResult.message || "Credenciais validadas com sucesso na API. O gateway respondeu e gerou cobrança Pix de teste normalmente." }),
+                          i.jsx("p", { children: apiValidationResult.message || (isUtmify ? "Token validado com sucesso na UTMify! Conexão operacional." : "Credenciais validadas com sucesso na API. O gateway respondeu e gerou cobrança Pix de teste normalmente.") }),
                           apiValidationResult.transactionId && i.jsxs("p", { className: "font-mono text-[11px] opacity-80", children: ["ID da Transação de Teste: ", apiValidationResult.transactionId] })
                         ]
                       }) : i.jsxs("div", {
                         className: "space-y-1 text-red-300/90",
                         children: [
                           i.jsx("p", { className: "font-medium", children: apiValidationResult.error || "Erro desconhecido ao testar API." }),
-                          i.jsx("p", { className: "text-[11px] opacity-80", children: "Dica: Verifique se as credenciais digitadas correspondem ao ambiente de Produção e se a chave possui permissão para gerar cobranças Pix." })
+                          i.jsx("p", { className: "text-[11px] opacity-80", children: isUtmify ? "Dica: Verifique se o token de API inserido é o token de autenticação gerado nas credenciais da sua conta UTMify." : "Dica: Verifique se as credenciais digitadas correspondem ao ambiente de Produção e se a chave possui permissão para gerar cobranças Pix." })
                         ]
                       })
                     ]
