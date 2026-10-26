@@ -439,6 +439,24 @@ async function handleApi(req, res, url) {
       return fail(req, res, 401, 'Endereço secreto inválido');
     }
 
+    if (authResult.user?.totpEnabled) {
+      const code = String(body.code || '').trim();
+      if (!code) {
+        return sendJson(req, res, 401, {
+          error: 'Código do autenticador obrigatório para este usuário',
+          totpRequired: true,
+        });
+      }
+      const isCodeValid = admin.verifyUserTotp(authResult.user, code);
+      if (!isCodeValid) {
+        admin.addAudit('login_fail', `Código 2FA incorreto para ${authResult.user.username}`, ip);
+        return sendJson(req, res, 401, {
+          error: 'Código do autenticador incorreto ou expirado',
+          totpRequired: true,
+        });
+      }
+    }
+
     const { token } = admin.createSession(req, ip, authResult.user);
     admin.addAudit('login_ok', `Login efetuado: ${authResult.user?.name || 'Administrador'}`, ip);
     return sendJson(req, res, 200, { ok: true, token, user: authResult.user });
