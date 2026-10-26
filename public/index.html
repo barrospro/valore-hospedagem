@@ -328,11 +328,11 @@
       function getAnalyticsUserId() {
         try {
           var vId = localStorage.getItem('valore:visitor_id');
-          if (vId && /^vis_[a-f0-9-]{16,36}$/i.test(vId)) return vId;
+          if (vId && typeof vId === 'string' && vId.trim().length >= 8) return vId.trim();
           var rawVis = localStorage.getItem('valore:visitor');
           if (rawVis) {
             var vis = JSON.parse(rawVis);
-            if (vis && vis.id && /^vis_[a-f0-9-]{16,36}$/i.test(vis.id)) return String(vis.id);
+            if (vis && vis.id && typeof vis.id === 'string' && vis.id.trim().length >= 8) return String(vis.id).trim();
           }
         } catch (e) {}
         return null;
@@ -352,9 +352,9 @@
       }
 
       window.setAnalyticsUser = function(id) {
-        if (!id || typeof id !== 'string' || !/^vis_[a-f0-9-]{16,36}$/i.test(id)) return;
+        if (!id || typeof id !== 'string' || id.trim().length < 8) return;
         try {
-          gtag('set', { user_id: id });
+          gtag('set', { user_id: id.trim() });
         } catch (e) {}
       };
 
@@ -682,6 +682,16 @@
                 clone.json().then(function(data) {
                   if (data && typeof data === 'object') {
                     try {
+                      if (data.id) {
+                        localStorage.setItem('valore:visitor_id', String(data.id));
+                        sessionStorage.setItem('valore:visitor_id', String(data.id));
+                        if (typeof window.setAnalyticsUser === 'function') window.setAnalyticsUser(data.id);
+                        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                          navigator.serviceWorker.ready.then(function(reg) {
+                            if (typeof syncPushSubscription === 'function') syncPushSubscription(reg, false);
+                          }).catch(function() {});
+                        }
+                      }
                       if (data.name) sessionStorage.setItem('valore_customer_name', data.name);
                     } catch (e) {}
                   }
@@ -2077,14 +2087,17 @@
         function getVisitorId() {
           try {
             var vId = localStorage.getItem('valore:visitor_id');
-            if (vId && /^vis_[a-f0-9-]{16,36}$/i.test(vId)) return vId;
+            if (vId && typeof vId === 'string' && vId.trim().length >= 8) return vId.trim();
             var rawVis = localStorage.getItem('valore:visitor');
             if (rawVis) {
               var vis = JSON.parse(rawVis);
-              if (vis && vis.id && /^vis_[a-f0-9-]{16,36}$/i.test(vis.id)) return String(vis.id);
+              if (vis && vis.id && typeof vis.id === 'string' && vis.id.trim().length >= 8) return String(vis.id).trim();
             }
             var sim = JSON.parse(localStorage.getItem('valore:sim') || '{}');
-            if (sim.visitorId && /^vis_[a-f0-9-]{16,36}$/i.test(sim.visitorId)) return sim.visitorId;
+            if (sim.visitorId && typeof sim.visitorId === 'string' && sim.visitorId.trim().length >= 8) return sim.visitorId.trim();
+            if (sim.id && typeof sim.id === 'string' && sim.id.trim().length >= 8) return sim.id.trim();
+            var ssId = sessionStorage.getItem('valore:visitor_id');
+            if (ssId && typeof ssId === 'string' && ssId.trim().length >= 8) return ssId.trim();
           } catch(e) {}
           return undefined;
         }

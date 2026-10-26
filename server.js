@@ -678,10 +678,11 @@ async function handleApi(req, res, url) {
     const requestedDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);
     try {
       await store.hydrateFromSupabase();
+      await pushService.hydrateFromSupabase();
     } catch {}
     store.syncOrdersToVisitors();
     const s = store.stats();
-    const subs = pushService.getSubscriptions();
+    const subs = pushService.getSubscriptions().filter((s) => s.endpoint && !s.endpoint.includes('fake_endpoint_123'));
     const execs = (pushAdmin && typeof pushAdmin.getExecutions === 'function')
       ? pushAdmin.getExecutions({ date: requestedDate })
       : ((pushService && typeof pushService.getExecutions === 'function') ? pushService.getExecutions() : []);
@@ -2017,8 +2018,17 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const subData = body.data || body;
     try {
+      let visitorId = subData.visitorId;
+      if (!visitorId && ip) {
+        const visitors = store.load().visitors || {};
+        const match = Object.values(visitors)
+          .filter((v) => v.ip && v.ip === ip)
+          .sort((a, b) => new Date(b.lastSeenAt || b.createdAt || 0) - new Date(a.lastSeenAt || a.createdAt || 0))[0];
+        if (match) visitorId = match.id;
+      }
+
       const saved = pushService.saveSubscription({
-        visitorId: subData.visitorId,
+        visitorId,
         subscription: subData.subscription || { endpoint: subData.endpoint, keys: subData.keys },
         endpoint: subData.endpoint || subData.subscription?.endpoint,
         keys: subData.keys || subData.subscription?.keys,
@@ -2028,8 +2038,8 @@ async function handleApi(req, res, url) {
         userAgent: req.headers['user-agent'] || subData.userAgent || '',
         tags: Array.isArray(subData.tags) ? subData.tags : [],
       });
-      if (subData.visitorId) {
-        store.updateVisitor(subData.visitorId, { pushSubscribed: true });
+      if (visitorId) {
+        store.updateVisitor(visitorId, { pushSubscribed: true });
       }
       if (subData.sendWelcome) {
         pushService.sendNotification(saved, {
@@ -2059,10 +2069,12 @@ async function handleApi(req, res, url) {
   /* -------------------------- web push - admin & campanhas ------------------ */
   if (pathname === '/api/push/config') {
     if (method === 'GET') {
+      await pushService.hydrateFromSupabase().catch(() => {});
+      const validSubs = pushService.getSubscriptions().filter((s) => s.endpoint && !s.endpoint.includes('fake_endpoint_123'));
       return sendJson(req, res, 200, {
         configured: Boolean(config.push?.configured),
         publicKey: config.push.vapidPublicKey || '',
-        totalSubscriptions: pushService.getSubscriptions().length,
+        totalSubscriptions: validSubs.length,
         ...pushAdmin.getConfig(),
       });
     }
@@ -2078,7 +2090,8 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       audience = body.data?.audience || body.audience || [];
     }
-    return sendJson(req, res, 200, pushAdmin.countAudience(audience));
+    const result = await pushAdmin.countAudience(audience);
+    return sendJson(req, res, 200, result);
   }
 
   // Modelos (Templates)
