@@ -23,6 +23,12 @@
                     "description": "Simule seu empréstimo pessoal online de forma rápida, segura e transparente. Conheça as opções e prazos disponíveis na Valore Brasil.",
                     "indexable": true
           },
+          "/inicio": {
+                    "title": "Empréstimo Pessoal Online e Simulação de Crédito | Valore Brasil",
+                    "description": "Simule seu empréstimo pessoal online de forma rápida, segura e transparente. Conheça as opções e prazos disponíveis na Valore Brasil.",
+                    "indexable": true,
+                    "canonical": "https://www.valorebrasil.app/"
+          },
           "/valor": {
                     "title": "Simulação de Empréstimo e Parcelas | Valore Brasil",
                     "description": "Escolha o valor e a quantidade de parcelas ideais para seu planejamento financeiro com simulação transparente e sem compromisso.",
@@ -217,7 +223,7 @@
               title: item.title,
               description: item.description,
               indexable: item.indexable,
-              canonical: item.indexable ? ("https://www.valorebrasil.app" + (path === "/" ? "/" : path)) : null
+              canonical: item.canonical || (item.indexable ? ("https://www.valorebrasil.app" + (path === "/" ? "/" : path)) : null)
             };
           }
           if (path.startsWith("/recuperar/") || path === "/recuperar") {
@@ -310,7 +316,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <script type="module" crossorigin src="/assets/index-v11.js?v=11.9.5"></script>
+    <script type="module" crossorigin src="/assets/index-v11.js?v=11.9.6"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DUL9RZWL.css">
     <style>
       /* Desativa botão nativo de senha e limpar do Edge/Internet Explorer */
