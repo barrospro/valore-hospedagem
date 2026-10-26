@@ -747,9 +747,10 @@ async function handleApi(req, res, url) {
 
     const stored = store.getIntegrations() || {};
     const settings = store.getSettings() || {};
+    const deletedIds = (store.getDeletedIntegrations() || []).map(x => String(x).toLowerCase());
     const activeGatewayId = String(settings.activeGatewayId || 'nitropay').toLowerCase();
 
-    const result = [
+    const builtIns = [
       {
         id: 'nitropay',
         name: 'NitroPay',
@@ -827,9 +828,12 @@ async function handleApi(req, res, url) {
       },
     ];
 
+    const result = builtIns.filter(item => !deletedIds.includes(item.id.toLowerCase()));
+
     // Gateways customizados adicionados pelo usuário
     for (const [key, val] of Object.entries(stored)) {
       if (['nitropay', 'bspay', 'quantumpay', 'api-cpf', 'utmify'].includes(key)) continue;
+      if (deletedIds.includes(key.toLowerCase())) continue;
       if (val && typeof val === 'object') {
         const prov = val.provider || 'nitropay';
         result.push({
@@ -933,6 +937,10 @@ async function handleApi(req, res, url) {
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const integrationId = integrationMatch[1];
     store.removeIntegration(integrationId);
+    const currentSettings = store.getSettings() || {};
+    if (String(currentSettings.activeGatewayId || '').toLowerCase() === integrationId.toLowerCase()) {
+      store.setSettings({ activeGatewayId: 'nitropay' });
+    }
     admin.addAudit('integration_delete', `Gateway/integração ${integrationId} removida`, ip);
     return sendJson(req, res, 200, { ok: true, id: integrationId });
   }
