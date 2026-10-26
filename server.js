@@ -1291,6 +1291,9 @@ async function handleApi(req, res, url) {
         if (status === 'andamento' || status === 'em_andamento') {
           return st === 'andamento' || st === 'em_andamento';
         }
+        if (status === 'gerou_pix') {
+          return st === 'gerou_pix';
+        }
         if (status === 'abandono_funil' || status === 'abandonado') {
           return st === 'abandono_funil' || st === 'abandonado';
         }
