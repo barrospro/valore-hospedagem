@@ -312,6 +312,36 @@
     <meta http-equiv="Expires" content="0" />
     <script type="module" crossorigin src="/assets/index-v11.js?v=11.9.5"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DUL9RZWL.css">
+    <style>
+      /* Desativa botão nativo de senha e limpar do Edge/Internet Explorer */
+      input::-ms-reveal,
+      input::-ms-clear {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      /* Previne que ícones em inputs vazem para fora da caixa arredondada */
+      .password-wrapper {
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        width: 100% !important;
+      }
+      .password-toggle-btn {
+        position: absolute !important;
+        right: 14px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 4px !important;
+        cursor: pointer !important;
+        z-index: 10 !important;
+      }
+    </style>
     <!-- Vercel Web Analytics -->
     <script>
       window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
