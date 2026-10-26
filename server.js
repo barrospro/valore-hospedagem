@@ -1198,23 +1198,51 @@ async function handleApi(req, res, url) {
   }
 
   /* --------------------------------- produtos ------------------------------- */
-  if (pathname === '/api/products' && method === 'GET') {
-    await products.loadCustomProducts();
-    return sendJson(req, res, 200, products.all());
+  if (pathname === '/api/products') {
+    if (method === 'GET') {
+      await products.loadCustomProducts();
+      return sendJson(req, res, 200, products.all());
+    }
+    if (method === 'POST') {
+      const token = admin.extractToken(req);
+      if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+      const body = await readJson(req);
+      try {
+        const created = await products.createProduct(body.data || body);
+        admin.addAudit('product_create', `Criou order bump ${created.name}`, ip);
+        return sendJson(req, res, 201, created);
+      } catch (e) {
+        return fail(req, res, 400, e.message);
+      }
+    }
   }
 
   const productMatch = pathname.match(/^\/api\/products\/([\w-]+)$/);
-  if (productMatch && (method === 'PATCH' || method === 'PUT')) {
+  if (productMatch) {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const productId = productMatch[1];
-    const body = await readJson(req);
-    try {
-      const updated = products.updateProduct(productId, body);
-      admin.addAudit('product_update', `Alterou produto ${productId}: R$ ${updated.price}`, ip);
-      return sendJson(req, res, 200, updated);
-    } catch (e) {
-      return fail(req, res, 400, e.message);
+
+    if (method === 'PATCH' || method === 'PUT') {
+      const body = await readJson(req);
+      try {
+        const updated = await products.updateProduct(productId, body.data || body);
+        admin.addAudit('product_update', `Alterou produto ${productId}: R$ ${updated.price}`, ip);
+        return sendJson(req, res, 200, updated);
+      } catch (e) {
+        return fail(req, res, 400, e.message);
+      }
+    }
+
+    if (method === 'DELETE') {
+      try {
+        await products.loadCustomProducts();
+        const result = await products.deleteProduct(productId);
+        admin.addAudit('product_delete', `Excluiu order bump ${productId}`, ip);
+        return sendJson(req, res, 200, result);
+      } catch (e) {
+        return fail(req, res, 400, e.message);
+      }
     }
   }
 
