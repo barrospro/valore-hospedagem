@@ -417,6 +417,7 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/admin/login' && method === 'POST') {
     const body = await readJson(req);
     const password = String(body.password || '');
+    const username = String(body.username || '').trim();
     const pathKey = body.pathKey;
 
     if (admin.isIpBlocked(ip)) {
@@ -424,9 +425,12 @@ async function handleApi(req, res, url) {
       return fail(req, res, 403, 'Acesso bloqueado para este IP');
     }
 
-    if (!admin.verifyPassword(password)) {
-      admin.addAudit('login_fail', 'Senha incorreta', ip);
-      return fail(req, res, 401, 'Senha incorreta');
+    await admin.loadUsersFromSupabase();
+
+    const authResult = admin.verifyCredentials(password, username);
+    if (!authResult.valid) {
+      admin.addAudit('login_fail', `Falha de login${username ? ` (${username})` : ''}: Senha ou usuário incorreto`, ip);
+      return fail(req, res, 401, 'Senha ou usuário incorreto');
     }
 
     if (!admin.verifyPathKey(pathKey)) {
@@ -434,16 +438,21 @@ async function handleApi(req, res, url) {
       return fail(req, res, 401, 'Endereço secreto inválido');
     }
 
-    const { token } = admin.createSession(req, ip);
-    admin.addAudit('login_ok', 'Login efetuado com sucesso', ip);
-    return sendJson(req, res, 200, { ok: true, token });
+    const { token } = admin.createSession(req, ip, authResult.user);
+    admin.addAudit('login_ok', `Login efetuado: ${authResult.user?.name || 'Administrador'}`, ip);
+    return sendJson(req, res, 200, { ok: true, token, user: authResult.user });
   }
 
   if (pathname === '/api/admin/session' && method === 'GET') {
     const token = admin.extractToken(req);
     const sess = admin.getSessionByToken(token);
     if (!sess) return fail(req, res, 401, 'Sessão inválida ou expirada');
-    return sendJson(req, res, 200, { ok: true, active: true, user: 'admin', session: { id: sess.id, ip: sess.ip, label: sess.label } });
+    return sendJson(req, res, 200, {
+      ok: true,
+      active: true,
+      user: sess.user || { id: 'usr_admin_master', name: 'Gabriel (Administrador)', username: 'admin', role: 'admin' },
+      session: { id: sess.id, ip: sess.ip, label: sess.label },
+    });
   }
 
   if (pathname === '/api/admin/logout' && method === 'POST') {
@@ -516,6 +525,67 @@ async function handleApi(req, res, url) {
     admin.unblockIp(targetIp);
     admin.addAudit('ip_unblocked', `IP desbloqueado: ${targetIp}`, ip);
     return sendJson(req, res, 200, { ok: true });
+  }
+
+  /* -------------------------- usuários admin / perfis ------------------------ */
+  if (pathname === '/api/admin/users') {
+    const token = admin.extractToken(req);
+    const sess = admin.getSessionByToken(token);
+    if (!sess) return fail(req, res, 401, 'Não autorizado');
+
+    if (method === 'GET') {
+      await admin.loadUsersFromSupabase();
+      return sendJson(req, res, 200, admin.listUsers());
+    }
+
+    if (method === 'POST') {
+      if (sess.user?.role && sess.user.role !== 'admin') {
+        return fail(req, res, 403, 'Apenas administradores podem criar perfis');
+      }
+      const body = await readJson(req);
+      try {
+        const created = admin.createUser(body);
+        admin.addAudit('user_created', `Criou perfil de acesso: ${created.name} (${created.username})`, ip);
+        return sendJson(req, res, 201, created);
+      } catch (e) {
+        return fail(req, res, 400, e.message);
+      }
+    }
+  }
+
+  const adminUserMatch = pathname.match(/^\/api\/admin\/users\/([\w-]+)$/);
+  if (adminUserMatch) {
+    const token = admin.extractToken(req);
+    const sess = admin.getSessionByToken(token);
+    if (!sess) return fail(req, res, 401, 'Não autorizado');
+    const targetUserId = adminUserMatch[1];
+
+    if (method === 'PATCH' || method === 'PUT') {
+      if (sess.user?.role && sess.user.role !== 'admin') {
+        return fail(req, res, 403, 'Apenas administradores podem alterar perfis');
+      }
+      const body = await readJson(req);
+      try {
+        const updated = admin.updateUser(targetUserId, body);
+        admin.addAudit('user_updated', `Alterou perfil de acesso: ${updated.name}`, ip);
+        return sendJson(req, res, 200, updated);
+      } catch (e) {
+        return fail(req, res, 400, e.message);
+      }
+    }
+
+    if (method === 'DELETE') {
+      if (sess.user?.role && sess.user.role !== 'admin') {
+        return fail(req, res, 403, 'Apenas administradores podem excluir perfis');
+      }
+      try {
+        admin.deleteUser(targetUserId);
+        admin.addAudit('user_deleted', `Excluiu perfil de acesso ${targetUserId}`, ip);
+        return sendJson(req, res, 200, { ok: true });
+      } catch (e) {
+        return fail(req, res, 400, e.message);
+      }
+    }
   }
 
   if (pathname === '/api/admin/password' && method === 'PUT') {
@@ -901,6 +971,17 @@ async function handleApi(req, res, url) {
     try {
       const person = await cpf.lookup(body.cpf);
       const genderMap = { M: 'masculino', F: 'feminino' };
+      if (body.visitorId) {
+        store.updateVisitor(body.visitorId, {
+          cpf: String(body.cpf).replace(/\D/g, ''),
+          name: person.nome,
+          birthDate: person.nascimento,
+          phone: person.celular || null,
+          email: person.email || null,
+          motherName: person.nomeMae,
+          gender: genderMap[person.genero] || '',
+        });
+      }
       return sendJson(req, res, 200, {
         configured: config.cpf.configured,
         name: person.nome,
@@ -929,21 +1010,43 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/visitors' && method === 'GET') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
-    let all = store.listVisitors();
     const q = (searchParams.get('q') || '').toLowerCase().trim();
     const status = searchParams.get('status');
     const limit = Number(searchParams.get('limit')) || 20;
     const offset = Number(searchParams.get('offset')) || 0;
 
-    if (q) {
-      all = all.filter((v) => (v.name && v.name.toLowerCase().includes(q)) || (v.cpf && v.cpf.includes(q)) || (v.phone && v.phone.includes(q)) || (v.email && v.email.toLowerCase().includes(q)));
+    let items = null;
+    let total = 0;
+    let hasMore = false;
+
+    if (config.supabase?.configured) {
+      const resSupa = await supabase.listVisitorsWithCount({
+        limit,
+        offset,
+        stage: status && status !== 'todos' ? status : null,
+        search: q || null,
+      });
+      if (resSupa) {
+        items = resSupa.items;
+        total = resSupa.total;
+        hasMore = offset + items.length < total;
+      }
     }
-    if (status && status !== 'todos') {
-      all = all.filter((v) => v.stage === status || v.status === status);
+
+    if (!items) {
+      let all = store.listVisitors();
+      if (q) {
+        all = all.filter((v) => (v.name && v.name.toLowerCase().includes(q)) || (v.cpf && v.cpf.includes(q)) || (v.phone && v.phone.includes(q)) || (v.email && v.email.toLowerCase().includes(q)));
+      }
+      if (status && status !== 'todos') {
+        all = all.filter((v) => v.stage === status || v.status === status);
+      }
+      items = all.slice(offset, offset + limit);
+      total = all.length;
+      hasMore = offset + limit < all.length;
     }
-    const items = all.slice(offset, offset + limit);
-    const hasMore = offset + limit < all.length;
-    return sendJson(req, res, 200, { items, total: all.length, hasMore });
+
+    return sendJson(req, res, 200, { items, total, hasMore });
   }
 
   if (pathname === '/api/visitors' && method === 'POST') {
@@ -960,13 +1063,21 @@ async function handleApi(req, res, url) {
   if (visitorMatch) {
     const id = visitorMatch[1];
     if (method === 'GET') {
-      const v = store.getVisitor(id);
+      let v = store.getVisitor(id);
+      if (!v && config.supabase?.configured) {
+        v = await supabase.getVisitor(id);
+        if (v) store.upsertVisitorMemory(v);
+      }
       if (!v) return fail(req, res, 404, 'Visitante não encontrado');
       return sendJson(req, res, 200, v);
     }
     if (method === 'PATCH' || method === 'PUT') {
       const body = await readJson(req);
-      if (!store.getVisitor(id)) return fail(req, res, 404, 'Visitante não encontrado');
+      let v = store.getVisitor(id);
+      if (!v && config.supabase?.configured) {
+        v = await supabase.getVisitor(id);
+        if (v) store.upsertVisitorMemory(v);
+      }
       const updated = store.updateVisitor(id, body);
       triggerAutoRecoveryThrottled();
       return sendJson(req, res, 200, updated);
