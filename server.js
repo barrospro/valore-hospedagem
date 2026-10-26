@@ -678,25 +678,54 @@ async function handleApi(req, res, url) {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const requestedDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);
+    store.syncOrdersToVisitors();
     const s = store.stats();
     const subs = pushService.getSubscriptions();
     const execs = (pushService && typeof pushService.getExecutions === 'function') ? pushService.getExecutions() : [];
+
+    const allOrders = Object.values(store.load().orders || {});
+    const allVisitors = Object.values(store.load().visitors || {});
+    const dayOrders = allOrders.filter(o => (o.createdAt || '').slice(0, 10) === requestedDate);
+    const dayPaidOrders = allOrders.filter(o => (o.paidAt || o.createdAt || '').slice(0, 10) === requestedDate && o.status === 'COMPLETED');
+    const dayVisitors = allVisitors.filter(v => (v.createdAt || '').slice(0, 10) === requestedDate);
+    const dayRevenue = Number(dayPaidOrders.reduce((acc, o) => acc + (Number(o.amount) || 0), 0).toFixed(2));
+
     return sendJson(req, res, 200, {
       day: {
-        registrations: s.visitors || 0,
+        registrations: dayVisitors.length || s.visitors || 0,
         newPushSubs: subs.length,
-        pushSales: s.paid || 0,
-        pushRevenue: s.revenue || 0,
+        pushSales: dayPaidOrders.length || s.paid || 0,
+        pushRevenue: dayRevenue || s.revenue || 0,
         notificationsSent: execs.reduce((acc, e) => acc + (e.sent || 0), 0),
         executions: execs.length,
         activePushSubs: subs.length,
+
+        // Métricas gerais da oferta
+        offerTotalRevenue: s.totalRevenue,
+        offerCompletionRate: s.completionRate,
+        offerPixGenerated: s.pixGenerated,
+        offerPixPaid: s.pixPaid,
+        offerCheckoutAbandons: s.checkoutAbandons,
+        offerFunnelAbandons: s.funnelAbandons,
+        offerMidFunnelAbandonRate: s.midFunnelAbandonRate,
+        offerCheckoutAbandonRate: s.checkoutAbandonRate,
+      },
+      offer: {
+        totalRevenue: s.totalRevenue,
+        completionRate: s.completionRate,
+        pixGenerated: s.pixGenerated,
+        pixPaid: s.pixPaid,
+        checkoutAbandons: s.checkoutAbandons,
+        funnelAbandons: s.funnelAbandons,
+        midFunnelAbandonRate: s.midFunnelAbandonRate,
+        checkoutAbandonRate: s.checkoutAbandonRate,
       },
       series: [
         {
           date: requestedDate,
-          registrations: s.visitors || 0,
+          registrations: dayVisitors.length || s.visitors || 0,
           pushSubs: subs.length,
-          pushRevenue: s.revenue || 0,
+          pushRevenue: dayRevenue || s.revenue || 0,
         },
       ],
     });
@@ -1229,41 +1258,38 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/visitors' && method === 'GET') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    store.syncOrdersToVisitors();
     const q = (searchParams.get('q') || '').toLowerCase().trim();
     const status = searchParams.get('status');
     const limit = Number(searchParams.get('limit')) || 20;
     const offset = Number(searchParams.get('offset')) || 0;
 
-    let items = null;
-    let total = 0;
-    let hasMore = false;
-
-    if (config.supabase?.configured) {
-      const resSupa = await supabase.listVisitorsWithCount({
-        limit,
-        offset,
-        stage: status && status !== 'todos' ? status : null,
-        search: q || null,
+    let all = store.listVisitors();
+    if (q) {
+      all = all.filter((v) => (v.name && v.name.toLowerCase().includes(q)) || (v.cpf && v.cpf.includes(q)) || (v.phone && v.phone.includes(q)) || (v.email && v.email.toLowerCase().includes(q)) || (v.id && v.id.includes(q)));
+    }
+    if (status && status !== 'todos') {
+      all = all.filter((v) => {
+        const st = v.status || '';
+        if (status === 'andamento' || status === 'em_andamento') {
+          return st === 'andamento' || st === 'em_andamento';
+        }
+        if (status === 'abandono_funil' || status === 'abandonado') {
+          return st === 'abandono_funil' || st === 'abandonado';
+        }
+        if (status === 'abandono_pix') {
+          return st === 'abandono_pix';
+        }
+        if (status === 'pagou_pix' || status === 'comprador' || status === 'compradores') {
+          return st === 'pagou_pix' || st === 'comprador' || v.purchased;
+        }
+        return st === status || v.stage === status;
       });
-      if (resSupa) {
-        items = resSupa.items;
-        total = resSupa.total;
-        hasMore = offset + items.length < total;
-      }
     }
 
-    if (!items) {
-      let all = store.listVisitors();
-      if (q) {
-        all = all.filter((v) => (v.name && v.name.toLowerCase().includes(q)) || (v.cpf && v.cpf.includes(q)) || (v.phone && v.phone.includes(q)) || (v.email && v.email.toLowerCase().includes(q)));
-      }
-      if (status && status !== 'todos') {
-        all = all.filter((v) => v.stage === status || v.status === status);
-      }
-      items = all.slice(offset, offset + limit);
-      total = all.length;
-      hasMore = offset + limit < all.length;
-    }
+    const total = all.length;
+    const items = all.slice(offset, offset + limit);
+    const hasMore = offset + limit < total;
 
     return sendJson(req, res, 200, { items, total, hasMore });
   }
