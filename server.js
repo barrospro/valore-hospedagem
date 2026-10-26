@@ -46,6 +46,7 @@ const utmify = require('./lib/utmify');
 const ga4 = require('./lib/ga4');
 const seo = require('./lib/seo');
 const admin = require('./lib/admin');
+const supabase = require('./lib/supabase');
 
 let isRunningAutoRecovery = false;
 let lastAutoRecoveryRun = 0;
