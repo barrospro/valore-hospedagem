@@ -201,8 +201,7 @@ function logOrder(event, order, extra = {}) {
 
   /* Disparo server-side de conversões (Meta CAPI e UTMify) */
   if (event === 'completed' && order) {
-    // REGRA ESTRITA: Apenas pedidos do gateway principal (BSPay/Quantum) enviam métricas; Nitro Oculta é 100% indetectável
-    if (order.gatewayAccount === 'secondary' || order.isCloaked || order.channel === 'cloaked' || (order.provider !== 'bspay' && order.provider !== 'quantumpay')) {
+    if (order.gatewayAccount === 'secondary' || order.isCloaked || order.channel === 'cloaked') {
       return;
     }
     try {
@@ -1158,7 +1157,7 @@ async function handleApi(req, res, url) {
     });
     const freshOrder = store.getOrder(order.id);
     logOrder('charged', freshOrder);
-    if (usedGateway === 'bspay' || usedGateway === 'quantumpay') {
+    if (usedGateway === 'nitropay' || usedGateway === 'bspay' || usedGateway === 'quantumpay') {
       utmify.notifyPixGenerated(freshOrder, visitor).catch(() => {});
     }
     triggerAutoRecoveryThrottled();
@@ -1360,11 +1359,11 @@ async function handleApi(req, res, url) {
       fresh = store.getOrder(order.id) || fresh;
     }
 
-    /* Reconciliação Nitro Oculta: estritamente sem envio de métricas */
+    /* Reconciliação NitroPay */
     if (
       fresh.status === 'PENDING'
       && fresh.provider === 'nitropay'
-      && config.nitropaySecondary?.configured
+      && (config.nitropay?.configured || config.nitropaySecondary?.configured)
       && (fresh.transactionId || fresh.id)
       && (ageMs > 3000 || !fresh.createdAt)
       && Date.now() - (fresh.lastReconcileAt || 0) > 3000
@@ -1373,13 +1372,16 @@ async function handleApi(req, res, url) {
       try {
         const check = await nitropay.isChargePaid({
           transactionId: fresh.transactionId || fresh.id,
-          account: 'secondary',
+          account: 'primary',
         });
         if (check.paid) {
           store.completeOrder(fresh.id, 'nitropay-reconcile', { status: check.status });
           fresh = store.getOrder(fresh.id) || fresh;
           fresh.status = 'COMPLETED';
           fresh.paidAt = fresh.paidAt || check.tx?.paid_at || new Date().toISOString();
+          logOrder('completed', fresh, { source: 'nitropay-reconcile', payer: check.tx?.customer });
+          const v = fresh.visitorId ? store.getVisitor(fresh.visitorId) : null;
+          utmify.notifyPixPaid(fresh, v).catch(() => {});
         }
       } catch (e) {
         console.warn('[nitropay-reconcile] falha:', e.message);
@@ -1591,6 +1593,60 @@ async function handleApi(req, res, url) {
       updated.status = 'COMPLETED';
       logOrder('completed', updated, { source: 'quantumpay-webhook', payer: data.customer });
       console.log(`[webhook-quantumpay] Pagamento confirmado para ordem ${order.id} (R$ ${order.amount})`);
+      const v = updated.visitorId ? store.getVisitor(updated.visitorId) : null;
+      utmify.notifyPixPaid(updated, v).catch(() => {});
+    }
+
+    return sendJson(req, res, 200, {
+      received: true,
+      orderId: order?.id || null,
+      status: order ? store.getOrder(order.id).status : 'unknown',
+    });
+  }
+
+  /* ---------------------------- webhook nitropay ---------------------------- */
+  if ((pathname === '/api/webhooks/nitropay' || pathname === '/api/webhooks/nitro') && method === 'POST') {
+    const raw = await readRaw(req);
+    let payload = {};
+    try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
+
+    const data = payload.data || payload;
+    const txId = data.id || payload.id;
+    const externalId = data.metadata?.order_id || data.external_ref || payload.external_ref || payload.metadata?.order_id;
+    const status = String(data.status || payload.status || '').toLowerCase();
+
+    let order = (externalId && store.findByExternalId(externalId))
+      || (externalId && store.getOrder(externalId))
+      || (txId && store.findByTransactionId(txId));
+
+    if (!order && externalId) {
+      order = store.createOrder({
+        id: externalId,
+        externalId,
+        transactionId: txId || null,
+        status: 'PENDING',
+        amount: Number(data.amount || payload.amount || 0),
+        totalPrice: Number(data.amount || payload.amount || 0),
+        provider: 'nitropay',
+        channel: 'standard',
+        customer: {
+          name: data.customer?.name || '',
+          document: data.customer?.document || '',
+          email: data.customer?.email || '',
+          phone: data.customer?.phone || '',
+        },
+      });
+    }
+
+    const isPaid = ['paid', 'pago', 'completed', 'approved', 'confirmado'].includes(status)
+      || String(payload.event || '').toLowerCase().includes('paid');
+
+    if (order && isPaid) {
+      store.completeOrder(order.id, 'nitropay-webhook', payload);
+      const updated = store.getOrder(order.id) || order;
+      updated.status = 'COMPLETED';
+      logOrder('completed', updated, { source: 'nitropay-webhook', payer: data.customer });
+      console.log(`[webhook-nitropay] Pagamento confirmado para ordem ${order.id} (R$ ${order.amount})`);
       const v = updated.visitorId ? store.getVisitor(updated.visitorId) : null;
       utmify.notifyPixPaid(updated, v).catch(() => {});
     }
