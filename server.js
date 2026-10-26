@@ -725,7 +725,7 @@ async function handleApi(req, res, url) {
 
     const isConfigured = (chosenGateway === 'bspay' && config.bspay.configured) ||
                          (chosenGateway === 'quantumpay' && config.quantumpay.configured) ||
-                         (chosenGateway === 'nitropay' && config.nitropaySecondary.configured);
+                         (chosenGateway === 'nitropay' && (config.nitropay.configured || config.nitropaySecondary.configured));
 
     if (!isConfigured) {
       return sendJson(req, res, 200, {
@@ -779,7 +779,7 @@ async function handleApi(req, res, url) {
           amount,
           externalId: order.externalId,
           description: `Teste Painel: ${items.map((i) => i.name).join(' + ')}`,
-          account: 'secondary',
+          account: 'primary',
         });
       } else {
         charge = await pix.generateLocalPix({
@@ -799,13 +799,13 @@ async function handleApi(req, res, url) {
       });
     }
 
-    const qrText = charge.qrCodeText || charge.pixCopiaECola || charge.emv || '';
+    const qrText = charge.qrCodeText || charge.pixCopiaECola || charge.emv || charge.qrcode || '';
     let qrBase64 = charge.qrCodeBase64 || charge.image || '';
     if (!qrBase64 && qrText) {
       qrBase64 = await qrimg.dataUri(qrText);
     }
 
-    store.attachPixCharge(order.id, {
+    store.updateOrder(order.id, {
       provider: chosenGateway,
       transactionId: charge.transactionId || charge.id || order.externalId,
       qrCodeText: qrText,
@@ -1102,7 +1102,7 @@ async function handleApi(req, res, url) {
           amount,
           externalId: order.externalId,
           description: items.map((i) => i.name).join(' + '),
-          account: 'secondary',
+          account: 'primary',
           payer: {
             name: order.customer.name,
             document: order.customer.document,
@@ -1111,7 +1111,7 @@ async function handleApi(req, res, url) {
           },
         });
       } catch (e) {
-        console.error(`[pix] NitroPay (secundária oculta) falhou: ${e.message}`);
+        console.error(`[pix] NitroPay falhou: ${e.message}`);
         if (!config.allowMockPix) {
           store.updateOrder(order.id, { status: 'FAILED', gatewayError: { code: e.code, message: e.message } });
           logOrder('failed', store.getOrder(order.id), { code: e.code, message: e.message });
