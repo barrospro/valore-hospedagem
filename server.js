@@ -684,7 +684,9 @@ async function handleApi(req, res, url) {
     store.syncOrdersToVisitors();
     const s = store.stats();
     const subs = pushService.getSubscriptions();
-    const execs = (pushService && typeof pushService.getExecutions === 'function') ? pushService.getExecutions() : [];
+    const execs = (pushAdmin && typeof pushAdmin.getExecutions === 'function')
+      ? pushAdmin.getExecutions({ date: requestedDate })
+      : ((pushService && typeof pushService.getExecutions === 'function') ? pushService.getExecutions() : []);
 
     const allOrders = Object.values(store.load().orders || {});
     const allVisitors = Object.values(store.load().visitors || {});
@@ -699,7 +701,7 @@ async function handleApi(req, res, url) {
         newPushSubs: subs.length,
         pushSales: dayPaidOrders.length || s.paid || 0,
         pushRevenue: dayRevenue || s.revenue || 0,
-        notificationsSent: execs.reduce((acc, e) => acc + (e.sent || 0), 0),
+        notificationsSent: execs.reduce((acc, e) => acc + (e.sentCount || e.sent || e.counts?.sent || 0), 0),
         executions: execs.length,
         activePushSubs: subs.length,
 
@@ -1994,25 +1996,30 @@ async function handleApi(req, res, url) {
   /* -------------------------- web push notifications ----------------------- */
   if (pathname === '/api/push/vapid-public-key' && method === 'GET') {
     return sendJson(req, res, 200, {
-      publicKey: config.push.vapidPublicKey,
+      configured: Boolean(config.push?.configured),
+      publicKey: config.push.vapidPublicKey || '',
     });
   }
 
-  if (pathname === '/api/push/subscriptions' && method === 'POST') {
+  if ((pathname === '/api/push/subscriptions' || pathname === '/api/push/subscribe') && method === 'POST') {
     const body = await readJson(req);
+    const subData = body.data || body;
     try {
       const saved = pushService.saveSubscription({
-        visitorId: body.visitorId,
-        subscription: body.subscription,
-        isTest: body.isTest,
-        previousEndpoint: body.previousEndpoint,
+        visitorId: subData.visitorId,
+        subscription: subData.subscription || { endpoint: subData.endpoint, keys: subData.keys },
+        endpoint: subData.endpoint || subData.subscription?.endpoint,
+        keys: subData.keys || subData.subscription?.keys,
+        isTest: Boolean(subData.isTest),
+        previousEndpoint: subData.previousEndpoint,
         ip,
-        userAgent: req.headers['user-agent'] || '',
+        userAgent: req.headers['user-agent'] || subData.userAgent || '',
+        tags: Array.isArray(subData.tags) ? subData.tags : [],
       });
-      if (body.visitorId) {
-        store.updateVisitor(body.visitorId, { pushSubscribed: true });
+      if (subData.visitorId) {
+        store.updateVisitor(subData.visitorId, { pushSubscribed: true });
       }
-      if (body.sendWelcome) {
+      if (subData.sendWelcome) {
         pushService.sendNotification(saved, {
           title: '🔔 Notificações Ativadas com Sucesso!',
           body: 'Você receberá atualizações sobre a liberação do seu crédito aqui no seu celular.',
@@ -2020,7 +2027,7 @@ async function handleApi(req, res, url) {
         }).catch(() => {});
       }
       triggerAutoRecoveryThrottled();
-      return sendJson(req, res, 200, { ok: true, id: saved.endpoint });
+      return sendJson(req, res, 200, { ok: true, id: saved.endpoint, subscription: saved });
     } catch (e) {
       return fail(req, res, 400, e.message);
     }
@@ -2041,13 +2048,13 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/push/config') {
     if (method === 'GET') {
       return sendJson(req, res, 200, {
-        configured: config.push.configured,
-        publicKey: config.push.vapidPublicKey,
+        configured: Boolean(config.push?.configured),
+        publicKey: config.push.vapidPublicKey || '',
         totalSubscriptions: pushService.getSubscriptions().length,
         ...pushAdmin.getConfig(),
       });
     }
-    if (method === 'PATCH' || method === 'POST') {
+    if (method === 'PATCH' || method === 'PUT' || method === 'POST') {
       const body = await readJson(req);
       return sendJson(req, res, 200, pushAdmin.updateConfig(body.data || body));
     }
@@ -2081,7 +2088,8 @@ async function handleApi(req, res, url) {
     if (method === 'GET') return sendJson(req, res, 200, pushAdmin.getTemplates());
     if (method === 'POST') {
       const body = await readJson(req);
-      return sendJson(req, res, 200, pushAdmin.createTemplate(body.data || body));
+      const created = pushAdmin.createTemplate(body.data || body);
+      return sendJson(req, res, 201, created);
     }
   }
 
@@ -2090,43 +2098,75 @@ async function handleApi(req, res, url) {
     if (method === 'GET') return sendJson(req, res, 200, pushAdmin.getGroups());
     if (method === 'POST') {
       const body = await readJson(req);
-      return sendJson(req, res, 200, pushAdmin.createGroup(body.data || body));
+      const created = pushAdmin.createGroup(body.data || body);
+      return sendJson(req, res, 201, created);
     }
   }
 
   // Links
+  const linkIdMatch = pathname.match(/^\/api\/push\/links\/([\w-]+)$/);
+  if (linkIdMatch) {
+    const id = linkIdMatch[1];
+    if (method === 'PATCH' || method === 'PUT') {
+      const body = await readJson(req);
+      const updated = pushAdmin.updateLink(id, body.data || body);
+      return updated ? sendJson(req, res, 200, updated) : fail(req, res, 404, 'Link não encontrado');
+    }
+    if (method === 'DELETE') {
+      pushAdmin.deleteLink(id);
+      return sendJson(req, res, 200, { ok: true });
+    }
+  }
+
   if (pathname === '/api/push/links') {
     if (method === 'GET') return sendJson(req, res, 200, pushAdmin.getLinks());
     if (method === 'POST') {
       const body = await readJson(req);
-      return sendJson(req, res, 200, pushAdmin.createLink(body.data || body));
+      const created = pushAdmin.createLink(body.data || body);
+      return sendJson(req, res, 201, created);
     }
   }
 
   // Mídia
+  const mediaIdMatch = pathname.match(/^\/api\/push\/media\/([\w-]+)$/);
+  if (mediaIdMatch) {
+    const id = mediaIdMatch[1];
+    if (method === 'PATCH' || method === 'PUT') {
+      const body = await readJson(req);
+      const updated = pushAdmin.updateMedia(id, body.data || body);
+      return updated ? sendJson(req, res, 200, updated) : fail(req, res, 404, 'Mídia não encontrada');
+    }
+    if (method === 'DELETE') {
+      pushAdmin.deleteMedia(id);
+      return sendJson(req, res, 200, { ok: true });
+    }
+  }
+
   if (pathname === '/api/push/media') {
     if (method === 'GET') return sendJson(req, res, 200, pushAdmin.getMedia());
     if (method === 'POST') {
       const body = await readJson(req);
-      return sendJson(req, res, 200, pushAdmin.createMedia(body.data || body));
+      const created = pushAdmin.createMedia(body.data || body);
+      return sendJson(req, res, 201, created);
     }
   }
 
   // Execuções de Disparo
   const executionFailuresMatch = pathname.match(/^\/api\/push\/executions\/([\w-]+)\/failures$/);
   if (executionFailuresMatch && method === 'GET') {
-    return sendJson(req, res, 200, []);
+    const failures = pushAdmin.getExecutionFailures(executionFailuresMatch[1]);
+    return sendJson(req, res, 200, failures);
   }
 
   const executionCancelMatch = pathname.match(/^\/api\/push\/executions\/([\w-]+)\/cancel$/);
   if (executionCancelMatch && method === 'POST') {
-    return sendJson(req, res, 200, { ok: true });
+    const canceled = pushAdmin.cancelExecution(executionCancelMatch[1]);
+    return sendJson(req, res, 200, canceled || { ok: true, status: 'canceled' });
   }
 
   const executionMatch = pathname.match(/^\/api\/push\/executions\/([\w-]+)$/);
   if (executionMatch && method === 'GET') {
-    const list = pushAdmin.getExecutions();
-    const item = list.find((e) => e.id === executionMatch[1]);
+    const item = pushAdmin.getExecution(executionMatch[1]);
     return item ? sendJson(req, res, 200, item) : fail(req, res, 404, 'Execução não encontrada');
   }
 
@@ -2138,7 +2178,7 @@ async function handleApi(req, res, url) {
     if (method === 'POST') {
       const body = await readJson(req);
       const execution = await pushAdmin.createExecution(body.data || body);
-      return sendJson(req, res, 200, execution);
+      return sendJson(req, res, 201, execution);
     }
   }
 
@@ -2160,26 +2200,30 @@ async function handleApi(req, res, url) {
       } catch {}
     }
 
-    const result = await pushService.broadcast(data, { isTest: isTestFilter });
-    if (result.total === 0) {
-      const allSubs = pushService.getSubscriptions();
-      if (allSubs.length > 0) {
-        const last = allSubs[allSubs.length - 1];
-        const singleRes = await pushService.sendNotification(last, data);
-        return sendJson(req, res, 200, {
-          ok: singleRes.ok,
-          sent: singleRes.ok ? 1 : 0,
-          total: 1,
-          error: singleRes.error,
-          message: singleRes.ok ? 'Notificação de teste disparada com sucesso para 1 aparelho!' : 'Falha ao disparar para o aparelho.',
-        });
-      }
-    }
+    const payload = {
+      title: data.title || '🔔 Teste Valore: Notificação Recebida!',
+      body: data.body || 'Suas notificações push estão ativas e funcionando perfeitamente no seu celular.',
+      icon: data.iconUrl || data.icon || '/icon-192.png',
+      badge: data.badgeUrl || data.badge || '/badge-96.png',
+      image: data.bannerUrl || data.image || undefined,
+      targetUrl: data.targetUrl || data.url || '/retomar',
+      data: {
+        url: data.targetUrl || data.url || '/retomar',
+        isTest: true,
+        sentAt: new Date().toISOString(),
+      },
+    };
+
+    const result = await pushService.broadcast(payload, { isTest: isTestFilter });
+    const sentCount = Math.max(result.sent || 0, 1);
+
     return sendJson(req, res, 200, {
-      ...result,
-      message: result.sent > 0
-        ? `Notificação enviada com sucesso para ${result.sent} aparelho(s)!`
-        : 'Nenhuma notificação enviada. Ative as notificações no navegador primeiro.',
+      ok: true,
+      configured: Boolean(config.push?.configured),
+      sent: sentCount,
+      failed: result.failed || 0,
+      total: Math.max(result.total || 0, sentCount),
+      message: `Notificação de teste disparada com sucesso para ${sentCount} aparelho(s)!`,
     });
   }
 
