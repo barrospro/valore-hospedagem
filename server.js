@@ -678,6 +678,9 @@ async function handleApi(req, res, url) {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const requestedDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);
+    try {
+      await store.hydrateFromSupabase();
+    } catch {}
     store.syncOrdersToVisitors();
     const s = store.stats();
     const subs = pushService.getSubscriptions();
@@ -1258,6 +1261,9 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/visitors' && method === 'GET') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    try {
+      await store.hydrateFromSupabase();
+    } catch {}
     store.syncOrdersToVisitors();
     const q = (searchParams.get('q') || '').toLowerCase().trim();
     const status = searchParams.get('status');
