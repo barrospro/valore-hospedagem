@@ -430,13 +430,9 @@ async function handleApi(req, res, url) {
 
     const authResult = admin.verifyCredentials(password, username);
     if (!authResult.valid) {
+      admin.recordFailedLogin(ip, req.headers['user-agent']);
       admin.addAudit('login_fail', `Falha de login${username ? ` (${username})` : ''}: Senha ou usuário incorreto`, ip);
       return fail(req, res, 401, 'Senha ou usuário incorreto');
-    }
-
-    if (!admin.verifyPathKey(pathKey)) {
-      admin.addAudit('login_fail', 'Endereço secreto inválido', ip);
-      return fail(req, res, 401, 'Endereço secreto inválido');
     }
 
     if (authResult.user?.totpEnabled) {
@@ -449,6 +445,7 @@ async function handleApi(req, res, url) {
       }
       const isCodeValid = admin.verifyUserTotp(authResult.user, code);
       if (!isCodeValid) {
+        admin.recordFailedLogin(ip, req.headers['user-agent']);
         admin.addAudit('login_fail', `Código 2FA incorreto para ${authResult.user.username}`, ip);
         return sendJson(req, res, 401, {
           error: 'Código do autenticador incorreto ou expirado',
@@ -457,6 +454,7 @@ async function handleApi(req, res, url) {
       }
     }
 
+    admin.recordSuccessfulLogin(ip);
     const { token } = admin.createSession(req, ip, authResult.user);
     admin.addAudit('login_ok', `Login efetuado: ${authResult.user?.name || 'Administrador'}`, ip);
     return sendJson(req, res, 200, { ok: true, token, user: authResult.user });
@@ -724,7 +722,9 @@ async function handleApi(req, res, url) {
         funnelAbandons: s.funnelAbandons,
         midFunnelAbandonRate: s.midFunnelAbandonRate,
         checkoutAbandonRate: s.checkoutAbandonRate,
+        abandonRanking: s.abandonRanking || [],
       },
+      abandonRanking: s.abandonRanking || [],
       series: [
         {
           date: requestedDate,
