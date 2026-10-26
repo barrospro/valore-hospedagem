@@ -518,12 +518,17 @@ async function handleApi(req, res, url) {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const limit = Number(searchParams.get('limit')) || 100;
+    const supaAudit = await supabase.listAudit(limit);
+    if (supaAudit && supaAudit.length > 0) {
+      return sendJson(req, res, 200, supaAudit);
+    }
     return sendJson(req, res, 200, admin.getAudit(limit));
   }
 
   if (pathname === '/api/admin/ip-blocks' && method === 'GET') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    await admin.loadIpBlocksFromSupabase();
     return sendJson(req, res, 200, admin.listIpBlocks());
   }
 
@@ -532,6 +537,7 @@ async function handleApi(req, res, url) {
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const body = await readJson(req);
     admin.blockIp(body.ip, body.reason);
+    await admin.syncIpBlocksToSupabase();
     admin.addAudit('ip_blocked', `IP bloqueado: ${body.ip}`, ip);
     return sendJson(req, res, 200, { ok: true });
   }
@@ -542,6 +548,7 @@ async function handleApi(req, res, url) {
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const targetIp = decodeURIComponent(unblockMatch[1]);
     admin.unblockIp(targetIp);
+    await admin.syncIpBlocksToSupabase();
     admin.addAudit('ip_unblocked', `IP desbloqueado: ${targetIp}`, ip);
     return sendJson(req, res, 200, { ok: true });
   }
@@ -968,7 +975,23 @@ async function handleApi(req, res, url) {
 
   /* --------------------------------- produtos ------------------------------- */
   if (pathname === '/api/products' && method === 'GET') {
+    await products.loadCustomProducts();
     return sendJson(req, res, 200, products.all());
+  }
+
+  const productMatch = pathname.match(/^\/api\/products\/([\w-]+)$/);
+  if (productMatch && (method === 'PATCH' || method === 'PUT')) {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const productId = productMatch[1];
+    const body = await readJson(req);
+    try {
+      const updated = products.updateProduct(productId, body);
+      admin.addAudit('product_update', `Alterou produto ${productId}: R$ ${updated.price}`, ip);
+      return sendJson(req, res, 200, updated);
+    } catch (e) {
+      return fail(req, res, 400, e.message);
+    }
   }
 
   /* ------------------------------ consulta de CPF --------------------------- */
@@ -1111,6 +1134,7 @@ async function handleApi(req, res, url) {
 
     const body = await readJson(req);
     const visitorId = body.visitorId || null;
+    await products.loadCustomProducts();
     const items = products.resolveItems(body.productId || 'seguro-plus', body.bumpIds || []);
     if (!items.length) return fail(req, res, 400, 'Dados inválidos');
 
@@ -2114,6 +2138,12 @@ async function handler(req, res) {
   const host = req.headers['x-forwarded-host'] || req.headers.host || '127.0.0.1';
   const url = new URL(req.url, `${proto}://${host}`);
   try {
+    const ip = clientIp(req);
+    await admin.ensureIpBlocksLoaded();
+    if (admin.isIpBlocked(ip) && !url.pathname.startsWith('/api/webhooks/')) {
+      return fail(req, res, 403, 'Acesso bloqueado');
+    }
+
     if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
     } else {
