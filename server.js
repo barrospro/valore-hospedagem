@@ -277,11 +277,11 @@ const publicOrder = (o) => ({
 
 /** Postback derivado do host da requisição quando não há URL configurada. */
 function postbackFromRequest(req, gateway = 'quantumpay') {
-  if (gateway === 'quantumpay' && config.quantumpay?.postbackUrl) return config.quantumpay.postbackUrl;
-  if (gateway === 'bspay' && config.bspay?.postbackUrl) return config.bspay.postbackUrl;
-  const host = req.headers['x-forwarded-host'] || req.headers.host;
-  if (!host || /^(localhost|127\.0\.0\.1)/i.test(host)) return null;
-  const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || 'https';
+  const host = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
+  const proto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim() || 'https';
+  if (!host || /^(localhost|127\.0\.0\.1)/i.test(host)) {
+    return `https://www.valorebrasil.app/api/webhooks/${gateway}`;
+  }
   return `${proto}://${host}/api/webhooks/${gateway}`;
 }
 
@@ -705,43 +705,177 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/integrations' && method === 'GET') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
-    return sendJson(req, res, 200, [
+
+    // Sincroniza com Supabase para garantir que todas as instâncias tenham os dados
+    try {
+      await store.loadIntegrationsFromSupabase();
+    } catch {}
+
+    const stored = store.getIntegrations() || {};
+    const settings = store.getSettings() || {};
+    const activeGatewayId = String(settings.activeGatewayId || 'nitropay').toLowerCase();
+
+    const result = [
+      {
+        id: 'nitropay',
+        name: 'NitroPay',
+        category: 'Pagamento',
+        group: 'gateway',
+        provider: 'nitropay',
+        description: 'Gateway de pagamentos Pix NitroPay (chave pública e privada).',
+        isCustom: false,
+        isActiveCheckout: (activeGatewayId === 'nitropay'),
+        webhookActive: stored.nitropay?.webhookActive !== false,
+        webhookUrl: postbackFromRequest(req, 'nitropay'),
+        lastWebhookSync: stored.nitropay?.lastWebhookSync || null,
+        config: {
+          publicKey: stored.nitropay?.publicKey || config.nitropaySecondary?.publicKey || config.nitropay?.publicKey || '',
+          secretKey: stored.nitropay?.secretKey || config.nitropaySecondary?.secretKey || config.nitropay?.secretKey || '',
+        },
+      },
       {
         id: 'bspay',
+        name: 'BSPay',
+        category: 'Pagamento',
+        group: 'gateway',
+        provider: 'bspay',
+        description: 'Gateway Pix BSPay com confirmação automática.',
+        isCustom: false,
+        isActiveCheckout: (activeGatewayId === 'bspay'),
+        webhookActive: stored.bspay?.webhookActive !== false,
+        webhookUrl: postbackFromRequest(req, 'bspay'),
+        lastWebhookSync: stored.bspay?.lastWebhookSync || null,
         config: {
-          clientId: config.bspay?.clientId || '',
-          clientSecret: config.bspay?.clientSecret || '',
+          clientId: stored.bspay?.clientId || config.bspay?.clientId || '',
+          clientSecret: stored.bspay?.clientSecret || config.bspay?.clientSecret || '',
         },
       },
       {
         id: 'quantumpay',
+        name: 'QuantumPay',
+        category: 'Pagamento',
+        group: 'gateway',
+        provider: 'quantumpay',
+        description: 'Gateway Pix QuantumPay para geração e baixa de cobranças.',
+        isCustom: false,
+        isActiveCheckout: (activeGatewayId === 'quantumpay'),
+        webhookActive: stored.quantumpay?.webhookActive !== false,
+        webhookUrl: postbackFromRequest(req, 'quantumpay'),
+        lastWebhookSync: stored.quantumpay?.lastWebhookSync || null,
         config: {
-          accountId: config.quantumpay?.accountId || '',
-          apiKey: config.quantumpay?.apiKey || '',
-          apiSecret: config.quantumpay?.apiSecret || '',
-        },
-      },
-      {
-        id: 'nitropay',
-        config: {
-          publicKey: (config.nitropaySecondary?.publicKey || config.nitropay?.publicKey) || '',
-          secretKey: (config.nitropaySecondary?.secretKey || config.nitropay?.secretKey) || '',
+          accountId: stored.quantumpay?.accountId || config.quantumpay?.accountId || '',
+          apiKey: stored.quantumpay?.apiKey || config.quantumpay?.apiKey || '',
+          apiSecret: stored.quantumpay?.apiSecret || config.quantumpay?.apiSecret || '',
         },
       },
       {
         id: 'api-cpf',
+        name: 'API de CPF',
+        category: 'Dados',
+        group: 'service',
+        description: 'Consulta de CPF na etapa de simulação para preencher os dados do usuário.',
+        isCustom: false,
         config: {
-          baseUrl: config.cpf?.base || '',
-          token: config.cpf?.token || '',
+          baseUrl: stored['api-cpf']?.baseUrl || config.cpf?.base || '',
+          token: stored['api-cpf']?.token || config.cpf?.token || '',
         },
       },
       {
         id: 'utmify',
+        name: 'Utmify',
+        category: 'Rastreamento',
+        group: 'service',
+        description: 'Envio das conversões do fluxo para o rastreamento de campanhas.',
+        isCustom: false,
         config: {
-          token: config.utmify?.apiToken || '',
+          token: stored.utmify?.token || config.utmify?.apiToken || '',
         },
       },
-    ]);
+    ];
+
+    // Gateways customizados adicionados pelo usuário
+    for (const [key, val] of Object.entries(stored)) {
+      if (['nitropay', 'bspay', 'quantumpay', 'api-cpf', 'utmify'].includes(key)) continue;
+      if (val && typeof val === 'object') {
+        const prov = val.provider || 'nitropay';
+        result.push({
+          id: key,
+          name: val.name || `Gateway ${key}`,
+          category: 'Pagamento',
+          group: 'gateway',
+          provider: prov,
+          description: val.description || `Gateway Pix ${prov.toUpperCase()} customizado.`,
+          isCustom: true,
+          isActiveCheckout: (activeGatewayId === key),
+          webhookActive: val.webhookActive !== false,
+          webhookUrl: postbackFromRequest(req, key),
+          lastWebhookSync: val.lastWebhookSync || null,
+          config: val.config || val,
+        });
+      }
+    }
+
+    return sendJson(req, res, 200, result);
+  }
+
+  if (pathname === '/api/integrations' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    const provider = String(body.provider || 'nitropay').toLowerCase();
+    const rawName = String(body.name || `Gateway ${provider}`).trim();
+    const cleanId = String(body.id || rawName).toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || `gw-${Date.now()}`;
+    const id = ['nitropay', 'bspay', 'quantumpay', 'api-cpf', 'utmify'].includes(cleanId) ? `${cleanId}-${Date.now().toString(36)}` : cleanId;
+
+    const gatewayConfig = {
+      ...(body.config || {}),
+      name: rawName,
+      provider,
+      isCustom: true,
+      webhookActive: body.webhookActive !== false,
+      webhookUrl: postbackFromRequest(req, id),
+      createdAt: new Date().toISOString(),
+    };
+
+    const saved = store.setIntegration(id, gatewayConfig);
+    admin.addAudit('integration_add', `Novo gateway ${rawName} (${id}) cadastrado`, ip);
+    return sendJson(req, res, 201, {
+      ok: true,
+      id,
+      name: rawName,
+      provider,
+      config: saved,
+      webhookUrl: gatewayConfig.webhookUrl,
+      webhookActive: gatewayConfig.webhookActive,
+    });
+  }
+
+  const webhookSyncMatch = pathname.match(/^\/api\/integrations\/([\w-]+)\/webhook-sync$/);
+  if (webhookSyncMatch && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const integrationId = webhookSyncMatch[1];
+    const body = await readJson(req);
+    const webhookActive = body.webhookActive !== false;
+    const webhookUrl = postbackFromRequest(req, integrationId);
+
+    const current = store.getIntegrations()[integrationId] || {};
+    const updated = store.setIntegration(integrationId, {
+      ...current,
+      webhookActive,
+      webhookUrl,
+      lastWebhookSync: new Date().toISOString(),
+    });
+
+    admin.addAudit('webhook_sync', `Webhook de ${integrationId} sincronizado (${webhookActive ? 'Ativo' : 'Desativado'})`, ip);
+    return sendJson(req, res, 200, {
+      ok: true,
+      id: integrationId,
+      webhookUrl,
+      webhookActive,
+      syncedAt: new Date().toISOString(),
+      message: 'Webhook sincronizado com sucesso no Supabase e pronto para receber notificações Pix.',
+    });
   }
 
   const integrationMatch = pathname.match(/^\/api\/integrations\/([\w-]+)$/);
@@ -750,10 +884,23 @@ async function handleApi(req, res, url) {
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const integrationId = integrationMatch[1];
     const body = await readJson(req);
-    const newCfg = body.config || body.data || body;
+    const current = store.getIntegrations()[integrationId] || {};
+    const patchData = body.config || body.data || body;
+    const newCfg = { ...current, ...patchData };
+    if (body.webhookActive !== undefined) newCfg.webhookActive = body.webhookActive;
+    if (body.name) newCfg.name = body.name;
     const saved = store.setIntegration(integrationId, newCfg);
     admin.addAudit('integration_change', `Configurações de ${integrationId} salvas`, ip);
     return sendJson(req, res, 200, { ok: true, id: integrationId, config: saved });
+  }
+
+  if (integrationMatch && method === 'DELETE') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const integrationId = integrationMatch[1];
+    store.removeIntegration(integrationId);
+    admin.addAudit('integration_delete', `Gateway/integração ${integrationId} removida`, ip);
+    return sendJson(req, res, 200, { ok: true, id: integrationId });
   }
 
   if (pathname === '/api/cpf-test' && method === 'POST') {
@@ -819,30 +966,33 @@ async function handleApi(req, res, url) {
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
 
     const body = await readJson(req);
-    const productId = body.productId || body.data?.productId || 'seguro-plus';
-    const items = products.resolveItems(productId, []);
-    if (!items.length) {
-      return sendJson(req, res, 200, {
-        ok: false,
-        configured: true,
-        elapsedMs: Date.now() - t0,
-        error: 'Produto inválido para cobrança de teste.',
-      });
+    const chosenGateway = String(body.gatewayId || body.gateway || store.getNextGateway()).toLowerCase();
+    const stored = store.getIntegrations()[chosenGateway] || {};
+    const inputConfig = body.config || {};
+    const provider = String(body.provider || stored.provider || chosenGateway).toLowerCase();
+
+    // Se foram fornecidas credenciais específicas, aplica para validar
+    if (inputConfig && Object.keys(inputConfig).length > 0) {
+      store.applyIntegrationConfig(chosenGateway, { ...inputConfig, provider });
     }
 
-    const amount = products.totalOf(items);
-    const chosenGateway = store.getNextGateway();
+    const productId = body.productId || body.data?.productId || 'seguro-plus';
+    const items = products.resolveItems(productId, []);
+    const amount = items.length ? products.totalOf(items) : 27.97;
 
-    const isConfigured = (chosenGateway === 'bspay' && config.bspay.configured) ||
-                         (chosenGateway === 'quantumpay' && config.quantumpay.configured) ||
-                         (chosenGateway === 'nitropay' && (config.nitropay.configured || config.nitropaySecondary.configured));
+    const isConfigured = (provider === 'bspay' && config.bspay.configured) ||
+                         (provider === 'quantumpay' && config.quantumpay.configured) ||
+                         (provider === 'nitropay' && (config.nitropay.configured || config.nitropaySecondary.configured)) ||
+                         Boolean(inputConfig.publicKey || inputConfig.apiKey || inputConfig.clientId);
 
     if (!isConfigured) {
       return sendJson(req, res, 200, {
         ok: false,
         configured: false,
+        gateway: chosenGateway,
+        provider,
         elapsedMs: Date.now() - t0,
-        error: `O gateway ativo (${chosenGateway}) não possui credenciais válidas configuradas no painel ou nas variáveis de ambiente.`,
+        error: `O gateway ${chosenGateway} não possui credenciais válidas preenchidas para teste.`,
       });
     }
 
@@ -850,65 +1000,64 @@ async function handleApi(req, res, url) {
       visitorId: null,
       clientId: null,
       sessionId: null,
-      items,
+      items: items.length ? items : [{ id: 'teste-api', name: 'Validação Gateway Pix', price: amount }],
       amount,
       totalPrice: amount,
       externalId: makeExternalId(),
       provider: chosenGateway,
       channel: 'standard',
       customer: {
-        name: 'Administrador (Teste)',
+        name: 'Administrador (Validação)',
         document: '51095324861',
         email: 'admin@valorebrasil.app',
         phone: '11999999999',
       },
       ip,
     });
-    logOrder('created', order, { source: 'gateway-test' });
+    logOrder('created', order, { source: 'gateway-test', gateway: chosenGateway });
 
     let charge = null;
     try {
-      if (chosenGateway === 'bspay') {
+      if (provider === 'bspay') {
         charge = await bspay.createPixCharge({
           amount,
           externalId: order.externalId,
-          description: `Teste Painel: ${items.map((i) => i.name).join(' + ')}`,
-          postbackUrl: postbackFromRequest(req, 'bspay'),
+          description: `Validação API: ${items.map((i) => i.name).join(' + ') || 'Teste'}`,
+          postbackUrl: postbackFromRequest(req, chosenGateway),
           payer: order.customer,
         });
-      } else if (chosenGateway === 'quantumpay') {
+      } else if (provider === 'quantumpay') {
         charge = await quantumpay.createPixCharge({
           amount,
           externalId: order.externalId,
-          description: `Teste Painel: ${items.map((i) => i.name).join(' + ')}`,
-          postbackUrl: postbackFromRequest(req, 'quantumpay'),
+          description: `Validação API: ${items.map((i) => i.name).join(' + ') || 'Teste'}`,
+          postbackUrl: postbackFromRequest(req, chosenGateway),
           payer: order.customer,
         });
-      } else if (chosenGateway === 'nitropay') {
+      } else {
+        // nitropay ou outros
         charge = await nitropay.createPixCharge({
           amount,
           externalId: order.externalId,
-          description: `Teste Painel: ${items.map((i) => i.name).join(' + ')}`,
+          description: `Validação API: ${items.map((i) => i.name).join(' + ') || 'Teste'}`,
           account: 'primary',
-        });
-      } else {
-        charge = await pix.generateLocalPix({
-          amount,
-          externalId: order.externalId,
-          description: 'Teste Gateway',
         });
       }
     } catch (e) {
-      console.error(`[gateway-test] Falha ao gerar PIX no ${chosenGateway}:`, e.message);
+      const elapsedMs = Date.now() - t0;
+      console.error(`[gateway-test] Falha ao testar API do ${chosenGateway}:`, e.message);
       return sendJson(req, res, 200, {
         ok: false,
         configured: true,
+        gateway: chosenGateway,
+        provider,
         status: e.status || 500,
-        elapsedMs: Date.now() - t0,
-        error: `Falha no gateway ${chosenGateway}: ${e.message}`,
+        elapsedMs,
+        error: `Falha na API ${chosenGateway}: ${e.message}`,
       });
     }
 
+    const elapsedMs = Date.now() - t0;
     const qrText = charge.qrCodeText || charge.pixCopiaECola || charge.emv || charge.qrcode || '';
     let qrBase64 = charge.qrCodeBase64 || charge.image || '';
     if (!qrBase64 && qrText) {
@@ -926,7 +1075,11 @@ async function handleApi(req, res, url) {
     return sendJson(req, res, 200, {
       ok: true,
       configured: true,
-      elapsedMs: Date.now() - t0,
+      elapsedMs,
+      gateway: chosenGateway,
+      provider,
+      transactionId: charge.transactionId || charge.id || order.externalId,
+      message: `API conectada e operacional (${elapsedMs}ms). Pix gerado com sucesso!`,
       order: {
         id: order.id,
         status: 'PENDING',
@@ -1581,59 +1734,19 @@ async function handleApi(req, res, url) {
   }
 
 
-  /* ------------------------------ webhook nitropay --------------------------- */
-  if (pathname === '/api/webhooks/nitropay' && method === 'POST') {
-    const raw = await readRaw(req);
-    let payload = {};
-    try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
-
-    const data = payload.data || payload;
-    const txId = data.id || data.transaction_id || payload.id;
-    const externalId = data.external_ref || data.external_id || data.metadata?.order_id || payload.external_ref;
-    const status = String(data.status || payload.status || '').toLowerCase();
-    const event = String(payload.event || '').toLowerCase();
-
-    let order = (externalId && store.findByExternalId(externalId)) || (txId && store.findByTransactionId(txId));
-
-    if (!order && externalId) {
-      order = store.createOrder({
-        id: externalId,
-        externalId,
-        transactionId: txId || null,
-        status: 'PENDING',
-        amount: Number(data.amount || payload.amount || 0),
-        totalPrice: Number(data.amount || payload.amount || 0),
-        provider: 'nitropay',
-        channel: 'direct',
-        customer: {
-          name: data.customer?.name || '',
-          document: data.customer?.document || '',
-          email: data.customer?.email || '',
-          phone: data.customer?.phone || '',
-        },
-      });
+  /* ------------------------------ verificação de webhook ativo ---------------- */
+  const webhookGwCheck = pathname.match(/^\/api\/webhooks\/([\w-]+)$/);
+  if (webhookGwCheck && method === 'POST') {
+    const gwTarget = webhookGwCheck[1].toLowerCase();
+    const gwInt = store.getIntegrations()[gwTarget];
+    if (gwInt && gwInt.webhookActive === false) {
+      console.warn(`[webhook] Webhook do gateway ${gwTarget} está desativado no painel administrativo.`);
+      return sendJson(req, res, 200, { received: false, active: false, message: 'Webhook desativado no painel' });
     }
-
-    const isPaid = event === 'transaction.paid' || ['paid', 'pago', 'approved', 'confirmado'].includes(status);
-
-    if (order && isPaid) {
-      store.completeOrder(order.id, 'nitropay-webhook', payload);
-      const updated = store.getOrder(order.id) || order;
-      updated.status = 'COMPLETED';
-      updated.channel = order.channel || updated.channel || 'standard';
-      logOrder('completed', updated, { source: 'nitropay-webhook', payer: data.customer });
-      console.log(`[webhook] Pagamento confirmado para ordem ${order.id}`);
-    }
-
-    return sendJson(req, res, 200, {
-      received: true,
-      orderId: order?.id || null,
-      status: order ? store.getOrder(order.id).status : 'unknown',
-    });
   }
 
   /* ------------------------------ webhook bspay ------------------------------ */
-  if (pathname === '/api/webhooks/bspay' && method === 'POST') {
+  if ((pathname === '/api/webhooks/bspay' || pathname === '/api/webhooks/bs' || (pathname.startsWith('/api/webhooks/') && store.getIntegrations()[pathname.replace('/api/webhooks/', '')]?.provider === 'bspay')) && method === 'POST') {
     const raw = await readRaw(req);
     let payload = {};
     try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
@@ -1714,7 +1827,7 @@ async function handleApi(req, res, url) {
   }
 
   /* ---------------------------- webhook quantumpay -------------------------- */
-  if ((pathname === '/api/webhooks/quantumpay' || pathname === '/api/webhooks/quantum') && method === 'POST') {
+  if ((pathname === '/api/webhooks/quantumpay' || pathname === '/api/webhooks/quantum' || (pathname.startsWith('/api/webhooks/') && store.getIntegrations()[pathname.replace('/api/webhooks/', '')]?.provider === 'quantumpay')) && method === 'POST') {
     const raw = await readRaw(req);
     let payload = {};
     try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
@@ -1774,7 +1887,7 @@ async function handleApi(req, res, url) {
   }
 
   /* ---------------------------- webhook nitropay ---------------------------- */
-  if ((pathname === '/api/webhooks/nitropay' || pathname === '/api/webhooks/nitro') && method === 'POST') {
+  if ((pathname === '/api/webhooks/nitropay' || pathname === '/api/webhooks/nitro' || (pathname.startsWith('/api/webhooks/') && store.getIntegrations()[pathname.replace('/api/webhooks/', '')]?.provider === 'nitropay')) && method === 'POST') {
     const raw = await readRaw(req);
     let payload = {};
     try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
