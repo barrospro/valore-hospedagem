@@ -457,6 +457,7 @@ async function handleApi(req, res, url) {
     admin.recordSuccessfulLogin(ip);
     const { token } = admin.createSession(req, ip, authResult.user);
     admin.addAudit('login_ok', `Login efetuado: ${authResult.user?.name || 'Administrador'}`, ip);
+    res.setHeader('Set-Cookie', `adm_token=${token}; Path=/; SameSite=Lax; Max-Age=2592000`);
     return sendJson(req, res, 200, { ok: true, token, user: authResult.user });
   }
 
@@ -1293,6 +1294,7 @@ async function handleApi(req, res, url) {
     if (rateLimited(`cpf:${ip}`, config.rateLimit.cpfPerMin)) {
       return fail(req, res, 429, 'Muitas consultas. Aguarde um instante.');
     }
+    const body = await readJson(req);
     const isCpfActive = Boolean(config.cpf.configured && config.cpf.enabled !== false);
     if (!isCpfActive) {
       return sendJson(req, res, 200, {
