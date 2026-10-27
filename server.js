@@ -1373,7 +1373,10 @@ async function handleApi(req, res, url) {
         v = await supabase.getVisitor(id);
         if (v) store.upsertVisitorMemory(v);
       }
-      const updated = store.updateVisitor(id, body);
+      const updated = store.updateVisitor(id, body, {
+        ip,
+        userAgent: req.headers['user-agent'] || '',
+      });
       triggerAutoRecoveryThrottled();
       return sendJson(req, res, 200, updated);
     }
