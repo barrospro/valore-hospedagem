@@ -882,7 +882,7 @@ async function handleApi(req, res, url) {
       createdAt: new Date().toISOString(),
     };
 
-    const saved = store.setIntegration(id, gatewayConfig);
+    const saved = await store.setIntegration(id, gatewayConfig);
     admin.addAudit('integration_add', `Novo gateway ${rawName} (${id}) cadastrado`, ip);
     return sendJson(req, res, 201, {
       ok: true,
@@ -905,7 +905,7 @@ async function handleApi(req, res, url) {
     const webhookUrl = postbackFromRequest(req, integrationId);
 
     const current = store.getIntegrations()[integrationId] || {};
-    const updated = store.setIntegration(integrationId, {
+    const updated = await store.setIntegration(integrationId, {
       ...current,
       webhookActive,
       webhookUrl,
@@ -931,7 +931,9 @@ async function handleApi(req, res, url) {
     const current = store.getIntegrations()['api-cpf'] || {};
     const currentEnabled = current.enabled !== false && config.cpf.enabled !== false;
     const nextEnabled = body.enabled !== undefined ? Boolean(body.enabled) : !currentEnabled;
-    const updated = store.setIntegration('api-cpf', {
+    const updated = await store.setIntegration('api-cpf', {
+      baseUrl: current.baseUrl || config.cpf.base,
+      token: current.token || config.cpf.token,
       ...current,
       enabled: nextEnabled,
     });
@@ -960,7 +962,7 @@ async function handleApi(req, res, url) {
     if (patchData.enabled !== undefined) newCfg.enabled = patchData.enabled !== false;
     if (body.webhookActive !== undefined) newCfg.webhookActive = body.webhookActive;
     if (body.name) newCfg.name = body.name;
-    const saved = store.setIntegration(integrationId, newCfg);
+    const saved = await store.setIntegration(integrationId, newCfg);
     admin.addAudit('integration_change', `Configurações de ${integrationId} salvas`, ip);
     return sendJson(req, res, 200, { ok: true, id: integrationId, config: saved });
   }
@@ -969,10 +971,10 @@ async function handleApi(req, res, url) {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const integrationId = integrationMatch[1];
-    store.removeIntegration(integrationId);
+    await store.removeIntegration(integrationId);
     const currentSettings = store.getSettings() || {};
     if (String(currentSettings.activeGatewayId || '').toLowerCase() === integrationId.toLowerCase()) {
-      store.setSettings({ activeGatewayId: 'nitropay' });
+      await store.setSettings({ activeGatewayId: 'nitropay' });
     }
     admin.addAudit('integration_delete', `Gateway/integração ${integrationId} removida`, ip);
     return sendJson(req, res, 200, { ok: true, id: integrationId });
@@ -984,13 +986,25 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const rawCpf = String(body.cpf || '').replace(/\D/g, '');
     if (!rawCpf || rawCpf.length !== 11) return fail(req, res, 400, 'CPF inválido');
+
+    // Sincroniza credenciais mais recentes do Supabase se necessário
+    try {
+      await store.loadIntegrationsFromSupabase();
+    } catch {}
+
+    const stored = store.getIntegrations()['api-cpf'] || {};
+    if (stored.baseUrl && String(stored.baseUrl).trim()) config.cpf.base = String(stored.baseUrl).trim();
+    if (stored.token && String(stored.token).trim()) config.cpf.token = String(stored.token).trim();
+    if (stored.enabled !== undefined) config.cpf.enabled = stored.enabled !== false;
+    const isConfigured = Boolean(config.cpf.token && String(config.cpf.token).trim());
+
     const t0 = Date.now();
     try {
       const person = await cpf.lookup(rawCpf);
       const elapsedMs = Date.now() - t0;
       if (!person || !person.nome) {
         return sendJson(req, res, 200, {
-          configured: config.cpf.configured,
+          configured: isConfigured,
           ok: false,
           status: 404,
           elapsedMs,
@@ -998,7 +1012,7 @@ async function handleApi(req, res, url) {
         });
       }
       return sendJson(req, res, 200, {
-        configured: config.cpf.configured,
+        configured: isConfigured,
         ok: true,
         status: 200,
         elapsedMs,
@@ -1026,7 +1040,7 @@ async function handleApi(req, res, url) {
       });
     } catch (err) {
       return sendJson(req, res, 200, {
-        configured: config.cpf.configured,
+        configured: isConfigured,
         ok: false,
         status: err.status || 500,
         elapsedMs: Date.now() - t0,
