@@ -834,13 +834,35 @@ async function handleApi(req, res, url) {
           token: stored.utmify?.token || config.utmify?.apiToken || '',
         },
       },
+      {
+        id: 'meta-pixel',
+        name: 'Meta Pixel & CAPI',
+        category: 'Rastreamento',
+        group: 'service',
+        description: 'Integração de Meta Pixel (código de script no navegador) e Conversions API (CAPI) server-side com sincronização Supabase.',
+        isCustom: false,
+        enabled: stored['meta-pixel']?.enabled !== false && config.meta?.configured !== false,
+        config: {
+          enabled: stored['meta-pixel']?.enabled !== false,
+          pixels: Array.isArray(stored['meta-pixel']?.pixels) ? stored['meta-pixel'].pixels : [
+            {
+              id: 'px-2153492335604301',
+              pixelId: '2153492335604301',
+              name: 'Pixel Principal',
+              token: config.meta.pixelTokens?.['2153492335604301'] || '',
+              active: true,
+              createdAt: new Date().toISOString()
+            }
+          ],
+        },
+      },
     ];
 
     const result = builtIns.filter(item => !deletedIds.includes(item.id.toLowerCase()));
 
     // Gateways customizados adicionados pelo usuário
     for (const [key, val] of Object.entries(stored)) {
-      if (['nitropay', 'bspay', 'quantumpay', 'api-cpf', 'utmify'].includes(key)) continue;
+      if (['nitropay', 'bspay', 'quantumpay', 'api-cpf', 'utmify', 'meta-pixel'].includes(key)) continue;
       if (deletedIds.includes(key.toLowerCase())) continue;
       if (val && typeof val === 'object') {
         const prov = val.provider || 'nitropay';
@@ -871,7 +893,7 @@ async function handleApi(req, res, url) {
     const provider = String(body.provider || 'nitropay').toLowerCase();
     const rawName = String(body.name || `Gateway ${provider}`).trim();
     const cleanId = String(body.id || rawName).toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || `gw-${Date.now()}`;
-    const id = ['nitropay', 'bspay', 'quantumpay', 'api-cpf', 'utmify'].includes(cleanId) ? `${cleanId}-${Date.now().toString(36)}` : cleanId;
+    const id = ['nitropay', 'bspay', 'quantumpay', 'api-cpf', 'utmify', 'meta-pixel'].includes(cleanId) ? `${cleanId}-${Date.now().toString(36)}` : cleanId;
 
     const gatewayConfig = {
       ...(body.config || {}),
@@ -1057,6 +1079,221 @@ async function handleApi(req, res, url) {
     const customToken = body.token || body.config?.token;
     const result = await utmify.testConnection(customToken);
     return sendJson(req, res, 200, result);
+  }
+
+  // ------------------------- META PIXEL & CAPI ENDPOINTS -------------------------
+  if (pathname === '/api/meta-pixels' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    try {
+      await store.loadIntegrationsFromSupabase();
+    } catch {}
+    const stored = store.getIntegrations()['meta-pixel'] || {};
+    const pixels = Array.isArray(stored.pixels) ? stored.pixels : [];
+    return sendJson(req, res, 200, {
+      ok: true,
+      enabled: stored.enabled !== false,
+      configured: config.meta.configured,
+      pixels,
+    });
+  }
+
+  if (pathname === '/api/meta-pixels' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+
+    // Suporte a extração inteligente a partir de snippet de código Meta Pixel
+    let extractedPixelId = '';
+    const rawCode = String(body.pixelCode || body.code || '').trim();
+    if (rawCode) {
+      const matchInit = rawCode.match(/fbq\(\s*['"]init['"]\s*,\s*['"](\d+)['"]\s*\)/i);
+      const matchId = rawCode.match(/[?&]id=(\d+)/i) || rawCode.match(/['"]?id['"]?\s*:\s*['"]?(\d+)['"]?/i);
+      const matchDigits = rawCode.match(/\b(\d{14,17})\b/);
+      if (matchInit && matchInit[1]) extractedPixelId = matchInit[1];
+      else if (matchId && matchId[1]) extractedPixelId = matchId[1];
+      else if (matchDigits && matchDigits[1]) extractedPixelId = matchDigits[1];
+    }
+
+    const pixelId = String(body.pixelId || extractedPixelId || '').replace(/\D/g, '').trim();
+    if (!pixelId) {
+      return fail(req, res, 400, 'Não foi possível identificar o ID do Pixel. Cole o Meta Pixel Code completo ou informe o Pixel ID.');
+    }
+
+    const pixelToken = String(body.token || body.accessToken || '').trim();
+    const pixelName = String(body.name || `Pixel ${pixelId}`).trim();
+
+    try {
+      await store.loadIntegrationsFromSupabase();
+    } catch {}
+
+    const current = store.getIntegrations()['meta-pixel'] || {};
+    const pixels = Array.isArray(current.pixels) ? [...current.pixels] : [];
+
+    const existingIndex = pixels.findIndex(p => String(p.pixelId) === pixelId);
+    const pixelEntry = {
+      id: existingIndex >= 0 ? pixels[existingIndex].id : `px-${pixelId}`,
+      pixelId,
+      name: pixelName,
+      token: pixelToken || (existingIndex >= 0 ? pixels[existingIndex].token : ''),
+      code: rawCode || (existingIndex >= 0 ? pixels[existingIndex].code : ''),
+      active: body.active !== undefined ? Boolean(body.active) : true,
+      createdAt: existingIndex >= 0 ? pixels[existingIndex].createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      pixels[existingIndex] = pixelEntry;
+    } else {
+      pixels.push(pixelEntry);
+    }
+
+    const updatedConfig = {
+      ...current,
+      enabled: current.enabled !== false,
+      pixels,
+    };
+
+    await store.setIntegration('meta-pixel', updatedConfig);
+    admin.addAudit('integration_change', `Meta Pixel ${pixelId} salvo via painel`, ip);
+
+    return sendJson(req, res, 200, {
+      ok: true,
+      message: 'Meta Pixel salvo e sincronizado com sucesso no Supabase!',
+      pixel: pixelEntry,
+      pixels,
+    });
+  }
+
+  const pixelDeleteMatch = pathname.match(/^\/api\/meta-pixels\/([\w-]+)$/);
+  if (pixelDeleteMatch && method === 'DELETE') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const targetId = pixelDeleteMatch[1];
+
+    try {
+      await store.loadIntegrationsFromSupabase();
+    } catch {}
+
+    const current = store.getIntegrations()['meta-pixel'] || {};
+    const pixels = Array.isArray(current.pixels) ? current.pixels : [];
+    const remaining = pixels.filter(p => p.id !== targetId && String(p.pixelId) !== targetId);
+
+    const updatedConfig = {
+      ...current,
+      pixels: remaining,
+    };
+
+    await store.setIntegration('meta-pixel', updatedConfig);
+    admin.addAudit('integration_delete', `Meta Pixel ${targetId} removido via painel`, ip);
+
+    return sendJson(req, res, 200, {
+      ok: true,
+      message: 'Pixel removido com sucesso!',
+      pixels: remaining,
+    });
+  }
+
+  const pixelToggleMatch = pathname.match(/^\/api\/meta-pixels\/([\w-]+)\/toggle$/);
+  if (pixelToggleMatch && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const targetId = pixelToggleMatch[1];
+    const body = await readJson(req);
+
+    try {
+      await store.loadIntegrationsFromSupabase();
+    } catch {}
+
+    const current = store.getIntegrations()['meta-pixel'] || {};
+    const pixels = Array.isArray(current.pixels) ? [...current.pixels] : [];
+    const idx = pixels.findIndex(p => p.id === targetId || String(p.pixelId) === targetId);
+    if (idx === -1) return fail(req, res, 404, 'Pixel não encontrado');
+
+    const nextActive = body.active !== undefined ? Boolean(body.active) : !pixels[idx].active;
+    pixels[idx] = { ...pixels[idx], active: nextActive, updatedAt: new Date().toISOString() };
+
+    const updatedConfig = {
+      ...current,
+      pixels,
+    };
+
+    await store.setIntegration('meta-pixel', updatedConfig);
+    admin.addAudit('integration_change', `Meta Pixel ${targetId} ${nextActive ? 'ativado' : 'desativado'}`, ip);
+
+    return sendJson(req, res, 200, {
+      ok: true,
+      pixelId: targetId,
+      active: nextActive,
+      pixels,
+    });
+  }
+
+  if (pathname === '/api/meta-test' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    const pixelId = String(body.pixelId || '').replace(/\D/g, '').trim();
+    const metaToken = String(body.token || '').trim();
+
+    if (!pixelId) return fail(req, res, 400, 'Pixel ID obrigatório para teste');
+    if (!metaToken) return fail(req, res, 400, 'Token de Acesso obrigatório para teste do CAPI');
+
+    const t0 = Date.now();
+    try {
+      const url = `https://graph.facebook.com/v20.0/${pixelId}/events?access_token=${metaToken}`;
+      const payload = {
+        data: [
+          {
+            event_name: 'PageView',
+            event_time: Math.floor(Date.now() / 1000),
+            action_source: 'website',
+            user_data: {
+              client_ip_address: ip || '127.0.0.1',
+              client_user_agent: req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            },
+            custom_data: {
+              test_event: true,
+              source: 'Valore Admin Dashboard Test',
+            },
+          },
+        ],
+      };
+
+      const metaRes = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await metaRes.json();
+      const elapsedMs = Date.now() - t0;
+
+      if (metaRes.ok) {
+        return sendJson(req, res, 200, {
+          ok: true,
+          status: metaRes.status,
+          elapsedMs,
+          data: json,
+          message: `Evento de teste recebido com sucesso pela Meta! (${json.events_received || 1} evento recebido, trace_id: ${json.fbtrace_id || 'ok'})`,
+        });
+      } else {
+        return sendJson(req, res, 200, {
+          ok: false,
+          status: metaRes.status,
+          elapsedMs,
+          error: json?.error?.message || 'Falha ao validar com a Graph API da Meta',
+          data: json,
+        });
+      }
+    } catch (err) {
+      return sendJson(req, res, 200, {
+        ok: false,
+        status: 500,
+        elapsedMs: Date.now() - t0,
+        error: `Erro ao comunicar com a Meta: ${err.message}`,
+      });
+    }
   }
 
   if (pathname === '/api/gateway-test' && method === 'POST') {
@@ -2442,9 +2679,29 @@ function serveFile(res, file, req, requestPath) {
   try {
     let data = fs.readFileSync(file);
     if (isHtml) {
-      const htmlStr = data.toString('utf8');
-      const injected = seo.injectSeoIntoHtml(htmlStr, requestPath || '/');
-      data = Buffer.from(injected, 'utf8');
+      let htmlStr = data.toString('utf8');
+      htmlStr = seo.injectSeoIntoHtml(htmlStr, requestPath || '/');
+      try {
+        const storedMeta = store.getIntegrations()['meta-pixel'];
+        const enabled = storedMeta?.enabled !== false && config.meta?.configured !== false;
+        if (enabled) {
+          const pixels = Array.isArray(storedMeta?.pixels) ? storedMeta.pixels : [];
+          const activePixels = pixels.filter(p => p && p.active !== false && p.pixelId);
+          const pixelIds = activePixels.length > 0 ? activePixels.map(p => String(p.pixelId).trim()) : config.meta.pixelIds;
+          const missingIds = (pixelIds || []).filter(px => px && !htmlStr.includes(px));
+          if (missingIds.length > 0) {
+            const inits = missingIds.map(px => `fbq('init', '${px}');`).join('\n      ');
+            const noscripts = missingIds.map(px => `<img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${px}&ev=PageView&noscript=1" />`).join('\n      ');
+            if (htmlStr.includes("fbq('track', 'PageView');")) {
+              htmlStr = htmlStr.replace("fbq('track', 'PageView');", `${inits}\n      fbq('track', 'PageView');`);
+            }
+            if (htmlStr.includes('</noscript>')) {
+              htmlStr = htmlStr.replace('</noscript>', `  ${noscripts}\n    </noscript>`);
+            }
+          }
+        }
+      } catch (e) {}
+      data = Buffer.from(htmlStr, 'utf8');
     }
     const headers = {
       'Content-Type': MIME[ext] || 'application/octet-stream',
