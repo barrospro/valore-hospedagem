@@ -815,9 +815,11 @@ async function handleApi(req, res, url) {
         group: 'service',
         description: 'Consulta de CPF na etapa de simulação para preencher os dados do usuário.',
         isCustom: false,
+        enabled: stored['api-cpf']?.enabled !== false && config.cpf?.enabled !== false,
         config: {
           baseUrl: stored['api-cpf']?.baseUrl || config.cpf?.base || '',
           token: stored['api-cpf']?.token || config.cpf?.token || '',
+          enabled: stored['api-cpf']?.enabled !== false && config.cpf?.enabled !== false,
         },
       },
       {
@@ -921,6 +923,30 @@ async function handleApi(req, res, url) {
     });
   }
 
+  const cpfToggleMatch = pathname === '/api/integrations/api-cpf/toggle';
+  if (cpfToggleMatch && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    const current = store.getIntegrations()['api-cpf'] || {};
+    const currentEnabled = current.enabled !== false && config.cpf.enabled !== false;
+    const nextEnabled = body.enabled !== undefined ? Boolean(body.enabled) : !currentEnabled;
+    const updated = store.setIntegration('api-cpf', {
+      ...current,
+      enabled: nextEnabled,
+    });
+    config.cpf.enabled = nextEnabled;
+    config.cpf.configured = Boolean(config.cpf.token && nextEnabled);
+    admin.addAudit('integration_change', `API de CPF ${nextEnabled ? 'ativada' : 'desativada'}`, ip);
+    return sendJson(req, res, 200, {
+      ok: true,
+      id: 'api-cpf',
+      enabled: nextEnabled,
+      configured: config.cpf.configured,
+      message: nextEnabled ? 'API de CPF ativada com sucesso. Consultas automáticas no funil habilitadas.' : 'API de CPF desativada com sucesso. Modo de preenchimento manual ativo.',
+    });
+  }
+
   const integrationMatch = pathname.match(/^\/api\/integrations\/([\w-]+)$/);
   if (integrationMatch && method === 'PUT') {
     const token = admin.extractToken(req);
@@ -930,6 +956,8 @@ async function handleApi(req, res, url) {
     const current = store.getIntegrations()[integrationId] || {};
     const patchData = body.config || body.data || body;
     const newCfg = { ...current, ...patchData };
+    if (body.enabled !== undefined) newCfg.enabled = body.enabled !== false;
+    if (patchData.enabled !== undefined) newCfg.enabled = patchData.enabled !== false;
     if (body.webhookActive !== undefined) newCfg.webhookActive = body.webhookActive;
     if (body.name) newCfg.name = body.name;
     const saved = store.setIntegration(integrationId, newCfg);
@@ -1251,10 +1279,11 @@ async function handleApi(req, res, url) {
     if (rateLimited(`cpf:${ip}`, config.rateLimit.cpfPerMin)) {
       return fail(req, res, 429, 'Muitas consultas. Aguarde um instante.');
     }
-    const body = await readJson(req);
-    if (!config.cpf.configured) {
+    const isCpfActive = Boolean(config.cpf.configured && config.cpf.enabled !== false);
+    if (!isCpfActive) {
       return sendJson(req, res, 200, {
         configured: false,
+        enabled: false,
         name: null,
         birthDate: null,
         phone: null,
@@ -1403,7 +1432,7 @@ async function handleApi(req, res, url) {
     let customerEmail = String(clientCustomer.email || clientCustomer.eMail || visitor?.email || '').trim();
     let customerPhone = String(clientCustomer.phone || clientCustomer.celular || clientCustomer.telefone || clientCustomer.whatsapp || visitor?.phone || visitor?.celular || '').replace(/\D/g, '');
 
-    if ((!customerName || !customerEmail) && customerDoc && customerDoc.length === 11 && config.cpf.configured) {
+    if ((!customerName || !customerEmail) && customerDoc && customerDoc.length === 11 && config.cpf.configured && config.cpf.enabled !== false) {
       try {
         const person = await cpf.lookup(customerDoc);
         if (person) {
