@@ -1376,11 +1376,15 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/visitors' && method === 'POST') {
     const body = await readJson(req);
     const utm = Object.fromEntries([...searchParams].filter(([k]) => k.startsWith('utm_') || k === 'src' || k === 'sck'));
-    return sendJson(req, res, 200, store.createVisitor(body, {
+    const created = store.createVisitor(body, {
       ip,
       userAgent: req.headers['user-agent'] || '',
       utm,
-    }));
+    });
+    if (config.supabase?.configured) {
+      await supabase.upsertVisitor(created).catch(() => {});
+    }
+    return sendJson(req, res, 200, created);
   }
 
   const visitorMatch = pathname.match(/^\/api\/visitors\/([\w-]{4,64})$/);
@@ -1406,6 +1410,9 @@ async function handleApi(req, res, url) {
         ip,
         userAgent: req.headers['user-agent'] || '',
       });
+      if (config.supabase?.configured && updated) {
+        await supabase.upsertVisitor(updated).catch(() => {});
+      }
       triggerAutoRecoveryThrottled();
       return sendJson(req, res, 200, updated);
     }

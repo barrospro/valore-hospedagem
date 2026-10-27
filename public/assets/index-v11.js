@@ -1947,44 +1947,71 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   ]})
 ]}),
   (()=>{
-    const FUNNEL_ALL=["valor","cpf","confirmacao","dados","renda","analise","push","aprovacao","conta-digital","dia","endereco","contrato","digital","seguro","checkout","pagamento","iof","tarifa","download","taxa-app","limite","assinatura","resumo","processando"];
-    const curStage=t.stage||"valor";
+    const FUNNEL_ALL=["inicio","valor","cpf","confirmacao","dados","renda","analise","push","aprovacao","conta-digital","dia","endereco","contrato","digital","seguro","checkout","pagamento","iof","tarifa","download","taxa-app","limite","assinatura","resumo","processando","fila","validacao","validado","reprocessando","recusada","estorno"];
+    const curStage=t.stage||"inicio";
     const createdTime=new Date(t.createdAt||Date.now()).getTime();
     const lastTime=new Date(t.lastSeenAt||t.createdAt||Date.now()).getTime();
     const now=Date.now();
     const isSessionActive=t.status==="andamento"||(now-lastTime)<15*60*1000;
-    let steps=[];
-    if(Array.isArray(t.stageHistory)&&t.stageHistory.length>0){
-      let rawHistory=[...t.stageHistory];
-      const firstStage=rawHistory[0]?.stage;
-      const firstIdx=FUNNEL_ALL.indexOf(firstStage);
-      if(firstIdx>0){
-        const firstEnter=new Date(rawHistory[0].enteredAt||createdTime).getTime();
-        const preSec=Math.max(5,Math.round((firstEnter-createdTime)/1000));
-        const avgPreSec=Math.max(3,Math.round(preSec/firstIdx));
-        const missing=FUNNEL_ALL.slice(0,firstIdx).map((s,i)=>({stage:s,enteredAt:new Date(createdTime+(i*avgPreSec*1000)).toISOString()}));
-        rawHistory=[...missing,...rawHistory];
+
+    let maxIdx=FUNNEL_ALL.indexOf(curStage);
+    if(Array.isArray(t.stageHistory)){
+      for(const h of t.stageHistory){
+        const idx=FUNNEL_ALL.indexOf(h?.stage);
+        if(idx>maxIdx)maxIdx=idx;
       }
-      steps=rawHistory.map((item,idx,arr)=>{
-        const enter=new Date(item.enteredAt||createdTime).getTime();
-        const isCurrent=idx===arr.length-1;
-        const nextEnter=arr[idx+1]?new Date(arr[idx+1].enteredAt).getTime():(isCurrent&&isSessionActive?now:lastTime);
-        const durSec=Math.max(0,Math.round((nextEnter-enter)/1000));
-        return{stage:item.stage,label:Wx(item.stage),enteredAt:new Date(enter),durationSec:durSec,isCurrent};
-      });
-    }else{
-      const targetIdx=FUNNEL_ALL.indexOf(curStage);
-      const validIdx=targetIdx!==-1?targetIdx:0;
-      const sub=FUNNEL_ALL.slice(0,validIdx+1);
-      const totalSec=Math.max(10,Math.round(((isSessionActive?now:lastTime)-createdTime)/1000));
-      const avgStepSec=Math.max(3,Math.round(totalSec/sub.length));
-      steps=sub.map((s,idx)=>{
-        const enter=createdTime+(idx*avgStepSec*1000);
-        const isCurrent=idx===sub.length-1;
-        const durSec=isCurrent?Math.max(0,Math.round(((isSessionActive?now:lastTime)-enter)/1000)):avgStepSec;
-        return{stage:s,label:Wx(s),enteredAt:new Date(enter),durationSec:durSec,isCurrent};
-      });
     }
+    if(maxIdx<0)maxIdx=0;
+
+    const subStages=FUNNEL_ALL.slice(0,maxIdx+1);
+    const knownIndices={};
+    if(Array.isArray(t.stageHistory)){
+      for(const h of t.stageHistory){
+        const idx=subStages.indexOf(h?.stage);
+        if(idx!==-1&&h?.enteredAt){
+          const time=new Date(h.enteredAt).getTime();
+          if(!isNaN(time))knownIndices[idx]=time;
+        }
+      }
+    }
+    if(!knownIndices[0]){
+      knownIndices[0]=createdTime;
+    }
+    const lastIdx=subStages.length-1;
+    if(!knownIndices[lastIdx]||(lastIdx>0&&knownIndices[lastIdx]<=knownIndices[0])){
+      knownIndices[lastIdx]=Math.max(knownIndices[0]+(lastIdx*3000),lastTime);
+    }
+
+    const keyIndices=Object.keys(knownIndices).map(Number).sort((a,b)=>a-b);
+    const stageTimes=new Array(subStages.length);
+    for(let k=0;k<keyIndices.length-1;k++){
+      const i0=keyIndices[k],i1=keyIndices[k+1];
+      const t0=knownIndices[i0],t1=Math.max(t0+((i1-i0)*2000),knownIndices[i1]);
+      const stepCount=i1-i0,diff=t1-t0;
+      for(let i=i0;i<=i1;i++){
+        if(stageTimes[i]===undefined){
+          stageTimes[i]=Math.round(t0+(((i-i0)/stepCount)*diff));
+        }
+      }
+    }
+    for(let i=0;i<subStages.length;i++){
+      if(stageTimes[i]===undefined){
+        stageTimes[i]=knownIndices[i]||(stageTimes[i-1]?stageTimes[i-1]+3000:createdTime);
+      }
+    }
+
+    const steps=subStages.map((stage,idx)=>{
+      const enter=stageTimes[idx];
+      const isCurrent=idx===subStages.length-1;
+      let durSec=0;
+      if(idx<subStages.length-1){
+        durSec=Math.max(1,Math.round((stageTimes[idx+1]-enter)/1000));
+      }else{
+        const endTime=isSessionActive?now:lastTime;
+        durSec=Math.max(1,Math.round((endTime-enter)/1000));
+      }
+      return{stage,label:Wx(stage),enteredAt:new Date(enter),durationSec:durSec,isCurrent};
+    });
     const formatDur=s=>{if(s<=0)return"< 1s";if(s<60)return`${s}s`;const m=Math.floor(s/60),rem=s%60;return rem>0?`${m}m ${rem}s`:`${m}m`};
     const formatTime=d=>{try{return d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}catch{return"--:--"}};
     return i.jsxs("div",{className:"pt-2 border-t border-card-border/60",children:[
