@@ -836,10 +836,10 @@ async function handleApi(req, res, url) {
       },
       {
         id: 'meta-pixel',
-        name: 'Meta Pixel & CAPI',
+        name: 'Meta Pixel',
         category: 'Rastreamento',
         group: 'service',
-        description: 'Integração de Meta Pixel (código de script no navegador) e Conversions API (CAPI) server-side com sincronização Supabase.',
+        description: 'Pixel do Gerenciador de Anúncios do Facebook para rastreamento de conversões e eventos do funil com persistência no Supabase.',
         isCustom: false,
         enabled: stored['meta-pixel']?.enabled !== false && config.meta?.configured !== false,
         config: {

@@ -2063,13 +2063,14 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   }
 };
 
+const MetaIcon = (props) => i.jsx("svg", { viewBox: "0 0 24 24", fill: "currentColor", width: props.size || 16, height: props.size || 16, className: props.className, children: i.jsx("path", { d: "M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" }) });
 const $f = [
   { id: "bspay", name: "BSPay", category: "Pagamento", group: "gateway", provider: "bspay", description: "Gateway principal Pix com confirmação automática.", icon: _C, fields: PROVIDER_SPECS.bspay.fields },
   { id: "quantumpay", name: "QuantumPay", category: "Pagamento", group: "gateway", provider: "quantumpay", description: "Gateway Pix QuantumPay para geração e baixa de cobranças.", icon: _C, fields: PROVIDER_SPECS.quantumpay.fields },
   { id: "nitropay", name: "NitroPay", category: "Pagamento", group: "gateway", provider: "nitropay", description: "Gateway de pagamentos Pix NitroPay (chave pública e privada).", icon: _C, fields: PROVIDER_SPECS.nitropay.fields },
   { id: "api-cpf", name: "API de CPF", category: "Dados", group: "service", description: "Consulta de CPF na etapa de simulação para preencher os dados do usuário.", icon: K$, fields: [{ key: "baseUrl", label: "Base URL", kind: "text", placeholder: "https://api.exemplo.com.br/v1" }, { key: "token", label: "Token de autenticação", kind: "secret" }] },
   { id: "utmify", name: "Utmify", category: "Rastreamento", group: "service", description: "Envio das conversões do fluxo para o rastreamento de campanhas.", icon: Bee, fields: [{ key: "token", label: "Token da Utmify", kind: "secret" }] },
-  { id: "meta-pixel", name: "Meta Pixel & CAPI", category: "Rastreamento", group: "service", description: "Integração de Meta Pixel por código e Conversions API (CAPI) salva no Supabase com opção de adicionar e remover.", icon: Bee, fields: [] }
+  { id: "meta-pixel", name: "Meta Pixel", category: "Rastreamento", group: "service", description: "Pixel do Gerenciador de Anúncios do Facebook para rastreamento de conversões e eventos do funil.", icon: MetaIcon, fields: [] }
 ];
 
 const Oz = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-white/40 focus:ring-2 focus:ring-white/10";
@@ -2151,6 +2152,10 @@ function rqe() {
     if (isLoaded) {
       for (const item of t) {
         if (!list.some(x => x.id === item.id)) {
+          if (item.id === "meta-pixel" || item.group === "service") {
+            list.push({ id: item.id, name: item.name || "Meta Pixel", category: "Rastreamento", group: "service", description: item.description || "Pixel do Gerenciador de Anúncios do Facebook.", icon: MetaIcon, isCustom: false, fields: [] });
+            continue;
+          }
           const prov = item.provider || "nitropay";
           const spec = PROVIDER_SPECS[prov] || PROVIDER_SPECS.nitropay;
           list.push({
@@ -2437,6 +2442,7 @@ function rqe() {
       i.jsxs("div", {
         className: "shrink-0 border-b border-card-border p-3 lg:w-72 lg:border-b-0 lg:border-r",
         children: [
+          i.jsx("div", { className: "mb-2 px-3", children: i.jsx("span", { className: "font-mono text-[0.62rem] uppercase tracking-[0.16em] text-muted-foreground", children: "Serviços e Rastreamento" }) }),
           i.jsx("div", { className: "space-y-0.5", children: O.map(M) }),
           i.jsxs("div", {
             className: "mt-4 mb-2 flex items-center justify-between px-3",
@@ -3109,7 +3115,7 @@ var aqe=[" ","Enter","ArrowUp","ArrowDown"],iqe=[" ","Enter"],ec="Select",[kb,Mb
                     className: "flex items-center gap-2.5",
                     children: [
                       i.jsx("span", { className: "h-3 w-3 rounded-full bg-emerald-400 animate-pulse" }),
-                      i.jsx("h3", { className: "text-base font-bold text-foreground tracking-tight", children: "Meta Pixel & Conversions API (CAPI)" }),
+                      i.jsx("h3", { className: "text-base font-bold text-foreground tracking-tight", children: "Meta Pixel (Facebook)" }),
                       i.jsx("span", { className: "rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold text-emerald-400", children: "✓ SUPABASE SYNC" })
                     ]
                   }),
@@ -3169,7 +3175,7 @@ var aqe=[" ","Enter","ArrowUp","ArrowDown"],iqe=[" ","Enter"],ec="Select",[kb,Mb
               i.jsxs("div", {
                 children: [
                   i.jsx("h4", { className: "text-sm font-semibold text-foreground", children: "Adicionar Novo Meta Pixel" }),
-                  i.jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: "Cole o script completo do Meta Pixel fornecido pela Meta ou informe o Pixel ID e Token CAPI." })
+                  i.jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: "Cole o Meta Pixel Code fornecido pelo Gerenciador de Anúncios do Facebook ou informe o Pixel ID e Token CAPI." })
                 ]
               }),
               effectivePixelId && i.jsxs("span", {
