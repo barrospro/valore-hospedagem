@@ -38,6 +38,23 @@ const pix = require('./lib/pix');
 const qrimg = require('./lib/qrimg');
 const metaCapi = require('./lib/meta-capi');
 const quantumpay = require('./lib/quantumpay');
+// Rastreamento de eventos Meta Pixel disparados (em memória, reseta no restart)
+const metaEventLog = {
+  counts: {}, // { pixelId: { PageView: N, Lead: N, ... } }
+  recent: [], // últimos 50 eventos: [{ pixelId, event, timestamp, source }]
+};
+function trackMetaEvent(pixelId, eventName, source = 'system') {
+  if (!pixelId || !eventName) return;
+  metaEventLog.counts[pixelId] = metaEventLog.counts[pixelId] || {};
+  metaEventLog.counts[pixelId][eventName] = (metaEventLog.counts[pixelId][eventName] || 0) + 1;
+  metaEventLog.recent.unshift({
+    pixelId,
+    event: eventName,
+    timestamp: new Date().toISOString(),
+    source,
+  });
+  if (metaEventLog.recent.length > 50) metaEventLog.recent.pop();
+}
 const nitropay = require('./lib/nitropay');
 const pushService = require('./lib/push');
 const recovery = require('./lib/recovery');
@@ -212,6 +229,9 @@ function logOrder(event, order, extra = {}) {
         ...(order.customer || {}),
         ...(extra?.payer || {}),
       };
+      // Rastrear evento Purchase para todos os pixels ativos
+      const activePixels = config.meta.pixelIds || [];
+      activePixels.forEach(px => trackMetaEvent(px, 'Purchase', 'capi'));
       metaCapi.sendPurchase(order, combinedUser, { userData: extra?.payer || {} }).catch((e) => {
         console.warn('[meta-capi] falha ao enviar purchase:', e.message);
       });
@@ -1226,6 +1246,16 @@ async function handleApi(req, res, url) {
       pixelId: targetId,
       active: nextActive,
       pixels,
+    });
+  }
+
+  if (pathname === '/api/meta-events' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    return sendJson(req, res, 200, {
+      ok: true,
+      counts: metaEventLog.counts,
+      recent: metaEventLog.recent,
     });
   }
 

@@ -2919,6 +2919,8 @@ function MetaPixelManager() {
   const [testResults, setTestResults] = S.useState({});
   const [testingId, setTestingId] = S.useState(null);
   const [copiedId, setCopiedId] = S.useState(null);
+  const [expandedMetrics, setExpandedMetrics] = S.useState({});
+  const [eventData, setEventData] = S.useState({ counts: {}, recent: [] });
 
   const getAuthToken = () => {
     let tok = null;
@@ -2954,6 +2956,28 @@ function MetaPixelManager() {
 
   S.useEffect(() => {
     loadPixels();
+  }, []);
+
+  // Fetch Meta Pixel event metrics every 5 seconds
+  S.useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const tok = getAuthToken();
+        if (!tok) return;
+        const res = await fetch("/api/meta-events", {
+          headers: { "Authorization": "Bearer " + tok }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setEventData({ counts: data.counts || {}, recent: data.recent || [] });
+        }
+      } catch (err) {
+        console.warn("Erro ao carregar métricas Meta:", err);
+      }
+    };
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const detectedPixelId = S.useMemo(() => {
@@ -3391,6 +3415,74 @@ function MetaPixelManager() {
                   children: [
                     test.ok ? i.jsx(ht, { size: 14, className: "shrink-0 mt-0.5 text-emerald-400" }) : i.jsx(Vt, { size: 14, className: "shrink-0 mt-0.5 text-red-400" }),
                     i.jsx("span", { className: "flex-1", children: test.msg })
+                  ]
+                }),
+                // Painel expansível de métricas do pixel
+                i.jsxs("div", {
+                  className: "border-t border-card-border/60 pt-2.5 mt-2",
+                  children: [
+                    i.jsx("button", {
+                      type: "button",
+                      onClick: () => setExpandedMetrics(prev => ({ ...prev, [pId]: !prev[pId] })),
+                      className: "flex w-full items-center justify-between text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
+                      children: [
+                        i.jsxs("span", { className: "flex items-center gap-1.5", children: [
+                          i.jsx("span", { children: "📊" }),
+                          "Métricas de Eventos Disparados"
+                        ]}),
+                        i.jsx("span", {
+                          className: re("transition-transform", expandedMetrics[pId] ? "rotate-180" : ""),
+                          children: "▼"
+                        })
+                      ]
+                    }),
+                    expandedMetrics[pId] && i.jsxs("div", {
+                      className: "mt-3 space-y-3",
+                      children: [
+                        (() => {
+                          const pixelCounts = eventData.counts[pId] || {};
+                          const events = ['PageView', 'Lead', 'InitiateCheckout', 'AddPaymentInfo', 'Purchase'];
+                          const colors = { PageView: 'blue', Lead: 'purple', InitiateCheckout: 'amber', AddPaymentInfo: 'cyan', Purchase: 'emerald' };
+                          return i.jsx("div", {
+                            className: "grid grid-cols-2 sm:grid-cols-5 gap-2",
+                            children: events.map(ev => {
+                              const count = pixelCounts[ev] || 0;
+                              const color = colors[ev];
+                              return i.jsxs("div", {
+                                className: "rounded-lg border border-card-border/60 bg-white/[0.02] p-2.5 text-center",
+                                children: [
+                                  i.jsx("div", { className: "text-lg font-bold text-" + color + "-400", children: count }),
+                                  i.jsx("div", { className: "text-[10px] font-medium text-muted-foreground uppercase tracking-wider", children: ev })
+                                ]
+                              }, ev);
+                            })
+                          });
+                        })(),
+                        (() => {
+                          const pixelEvents = eventData.recent.filter(e => e.pixelId === pId).slice(0, 5);
+                          if (pixelEvents.length === 0) return i.jsx("p", { className: "text-xs text-muted-foreground text-center py-2", children: "Nenhum evento registrado ainda para este pixel." });
+                          return i.jsxs("div", {
+                            className: "space-y-1.5",
+                            children: [
+                              i.jsx("p", { className: "text-[10px] font-bold uppercase tracking-wider text-muted-foreground", children: "Últimos Disparos" }),
+                              pixelEvents.map((ev, idx) => {
+                                const time = new Date(ev.timestamp).toLocaleTimeString("pt-BR");
+                                return i.jsxs("div", {
+                                  className: "flex items-center justify-between rounded-md bg-white/[0.02] px-2.5 py-1.5 text-xs",
+                                  children: [
+                                    i.jsxs("span", { className: "flex items-center gap-2", children: [
+                                      i.jsx("span", { className: "font-mono font-bold text-emerald-400", children: ev.event }),
+                                      i.jsx("span", { className: "text-muted-foreground", children: ev.source })
+                                    ]}),
+                                    i.jsx("span", { className: "text-muted-foreground font-mono", children: time })
+                                  ]
+                                }, idx);
+                              })
+                            ]
+                          });
+                        })()
+                      ]
+                    })
                   ]
                 })
               ]

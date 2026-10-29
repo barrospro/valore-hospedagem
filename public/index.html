@@ -558,20 +558,13 @@
         function firePurchase(orderId, amount) {
           if (!orderId || trackedPurchases[orderId]) return;
 
-          try {
-            if (sessionStorage.getItem('order_cloaked_' + orderId) === '1' || sessionStorage.getItem('order_ch_' + orderId) === 'cloaked') {
-              trackedPurchases[orderId] = true;
-              sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
-              return;
-            }
-          } catch (e) {}
-
           trackedPurchases[orderId] = true;
           try {
             sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
           } catch (e) {}
 
-          var val = Number(amount || orderAmounts[orderId] || 16.00);
+          var val = Number(amount || orderAmounts[orderId] || 19.90);
+          if (isNaN(val) || val <= 0) val = 19.90;
           if (typeof window.fbq === 'function') {
             window.fbq('track', 'Purchase', {
               value: val,
@@ -593,10 +586,6 @@
               if (lastId && !trackedPurchases[lastId]) {
                 // Apenas dispara se o backend tiver retornado status confirmado como pago
                 if (sessionStorage.getItem('valore_order_paid_' + lastId) === '1') {
-                  if (sessionStorage.getItem('order_cloaked_' + lastId) === '1' || sessionStorage.getItem('order_ch_' + lastId) === 'cloaked') {
-                    trackedPurchases[lastId] = true;
-                    continue;
-                  }
                   firePurchase(lastId, orderAmounts[lastId]);
                 }
               }
@@ -783,10 +772,6 @@
                     var isCloaked = !!(order.isCloaked || order.channel === 'cloaked');
                     try {
                       sessionStorage.setItem('valore_pixel_orders', JSON.stringify(orderAmounts));
-                      if (isCloaked) {
-                        sessionStorage.setItem('order_cloaked_' + order.id, '1');
-                        sessionStorage.setItem('order_ch_' + order.id, 'cloaked');
-                      }
                     } catch (e) {}
 
                     if (isCloaked) {
@@ -831,12 +816,6 @@
               var orderMatch = url.match(/\/api\/orders\/([a-zA-Z0-9_-]{4,64})(?:[/?#]|$)/);
               if (orderMatch && method === 'GET') {
                 clone.json().then(function(data) {
-                  if (data && (data.isCloaked || data.channel === 'cloaked')) {
-                    try {
-                      sessionStorage.setItem('order_cloaked_' + (data.id || orderMatch[1]), '1');
-                      sessionStorage.setItem('order_ch_' + (data.id || orderMatch[1]), 'cloaked');
-                    } catch (e) {}
-                  }
                   if (data && data.status) {
                     var status = String(data.status).toUpperCase();
                     var isPaid = ['COMPLETED', 'PAID', 'APPROVED', 'CONFIRMED'].indexOf(status) !== -1;
