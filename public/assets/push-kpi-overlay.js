@@ -1,6 +1,7 @@
 /**
  * Push KPI Overlay - Standalone Vanilla JS
  * Injects a floating dashboard on /p/admin/push without touching React bundle.
+ * Includes authentication token extraction for API access.
  */
 (function() {
   // Only run on push admin page
@@ -115,13 +116,41 @@
 
   let currentPeriod = 'day';
 
+  function getAdminToken() {
+    // Try cookies first (same as lib/admin.js extractToken)
+    const cookies = document.cookie || '';
+    const match = cookies.match(/(?:adm_token|valore_admin_token|valore_session)=([^;]+)/i);
+    if (match) return decodeURIComponent(match[1].trim());
+    
+    // Fallback to localStorage
+    try {
+      const stored = localStorage.getItem('admin_token') || localStorage.getItem('valore_admin_token');
+      if (stored) return stored;
+    } catch (e) {}
+    
+    return null;
+  }
+
   async function fetchStats(period) {
     const content = overlay.querySelector('.kpi-content');
     content.innerHTML = '<div class="kpi-loading">Carregando...</div>';
     
     try {
-      const res = await fetch(`/api/push/stats?period=${period}`);
-      if (!res.ok) throw new Error('API error');
+      const token = getAdminToken();
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const res = await fetch(`/api/push/stats?period=${period}`, { headers });
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('Não autorizado - faça login no painel admin');
+        }
+        throw new Error(`API error: ${res.status}`);
+      }
+      
       const data = await res.json();
       
       content.innerHTML = `
@@ -137,7 +166,7 @@
         </div>
       `;
     } catch (err) {
-      content.innerHTML = `<div class="kpi-error">Erro ao carregar métricas</div>`;
+      content.innerHTML = `<div class="kpi-error">${err.message || 'Erro ao carregar métricas'}</div>`;
       console.error('[push-kpi-overlay]', err);
     }
   }
