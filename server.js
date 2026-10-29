@@ -43,6 +43,7 @@ const metaEventLog = {
   counts: {}, // { pixelId: { PageView: N, Lead: N, ... } }
   recent: [], // últimos 50 eventos: [{ pixelId, event, timestamp, source }]
 };
+let metricsSaveTimer = null;
 function trackMetaEvent(pixelId, eventName, source = 'system') {
   if (!pixelId || !eventName) return;
   metaEventLog.counts[pixelId] = metaEventLog.counts[pixelId] || {};
@@ -54,6 +55,15 @@ function trackMetaEvent(pixelId, eventName, source = 'system') {
     source,
   });
   if (metaEventLog.recent.length > 50) metaEventLog.recent.pop();
+  
+  // Debounce save to Supabase (every 5 seconds max)
+  if (metricsSaveTimer) clearTimeout(metricsSaveTimer);
+  metricsSaveTimer = setTimeout(() => {
+    supabase.saveMetaMetrics({
+      counts: metaEventLog.counts,
+      recent: metaEventLog.recent
+    }).catch(e => console.warn('[supabase] Falha ao salvar métricas:', e.message));
+  }, 5000);
 }
 const nitropay = require('./lib/nitropay');
 const pushService = require('./lib/push');
