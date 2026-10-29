@@ -601,6 +601,10 @@
           var args = arguments;
           var url = '';
           var method = 'GET';
+          // Debug: Log API calls
+          if (args[0] && typeof args[0] === 'string' && args[0].indexOf('/api/') !== -1) {
+            console.log('[Meta Pixel Debug] Fetch intercepted:', args[1] ? args[1].method : 'GET', args[0]);
+          }
 
           if (typeof args[0] === 'string') {
             url = args[0];
@@ -767,18 +771,15 @@
                 clone.json().then(function(data) {
                   var order = data && data.order;
                   if (order && order.id) {
-                    var amount = Number(order.amount || order.totalPrice || 0);
+                    var amount = Number(order.amount || order.totalPrice || 19.90);
                     orderAmounts[order.id] = amount;
+                    console.log('[Meta Pixel Debug] Order created:', order.id, 'Amount:', amount);
                     var isCloaked = !!(order.isCloaked || order.channel === 'cloaked');
                     try {
                       sessionStorage.setItem('valore_pixel_orders', JSON.stringify(orderAmounts));
                     } catch (e) {}
 
-                    if (isCloaked) {
-                      // INDETECTAVEL: Suprime InitiateCheckout, AddPaymentInfo e Google Tag
-                      return;
-                    }
-
+                    // Cloaking suppression removed to ensure Meta Pixel tracking
                     if (typeof window.fbq === 'function') {
                       window.fbq('track', 'InitiateCheckout', {
                         value: amount,
