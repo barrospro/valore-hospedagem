@@ -2843,6 +2843,17 @@ if (require.main === module) {
     console.log(`  API de CPF  ${config.cpf.configured ? 'configurada' : 'token placeholder'}`);
     if (!ready) console.warn('  [atenção] corrija os erros acima antes de receber tráfego.\n');
 
+    // Carrega métricas persistidas do Supabase no boot
+    if (typeof supabase !== 'undefined' && supabase.getMetaMetrics) {
+      supabase.getMetaMetrics().then(saved => {
+        if (saved && saved.counts) {
+          metaEventLog.counts = saved.counts;
+          metaEventLog.recent = saved.recent || [];
+          console.log('  Supabase    métricas de eventos restauradas');
+        }
+      }).catch(e => console.warn('  [supabase] Falha ao carregar métricas:', e.message));
+    }
+
     // Automação periódica de recuperação de vendas e conversão (a cada 2 minutos)
     setInterval(async () => {
       try {
