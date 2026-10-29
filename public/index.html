@@ -434,6 +434,18 @@
       (function() {
         if (typeof window === 'undefined') return;
 
+        // Helper para reportar eventos ao backend para o painel admin
+        function reportMetaEvent(eventName) {
+          try {
+            var pixelId = '2153492335604301';
+            fetch('/api/track-meta-event', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pixelId: pixelId, event: eventName })
+            }).catch(function(){});
+          } catch (e) {}
+        }
+
         // Não executa rastreamento no painel administrativo (/dash ou /p/*)
         function isAdminRoute() {
           var p = window.location.pathname;
@@ -467,6 +479,7 @@
             var currentMeta = typeof window.updateValoreSeo === 'function' ? window.updateValoreSeo(window.location.pathname) : null;
             if (typeof window.fbq === 'function') {
               window.fbq('track', 'PageView');
+              reportMetaEvent('PageView');
             }
             if (typeof window.gtag === 'function') {
               window.gtag('event', 'page_view', {
@@ -566,6 +579,7 @@
           var val = Number(amount || orderAmounts[orderId] || 19.90);
           if (isNaN(val) || val <= 0) val = 19.90;
           if (typeof window.fbq === 'function') {
+            reportMetaEvent('Purchase');
             window.fbq('track', 'Purchase', {
               value: val,
               currency: 'BRL',
@@ -693,6 +707,7 @@
                     } catch (e) {}
                     if (typeof window.fbq === 'function') {
                       window.fbq('track', 'Lead');
+                      reportMetaEvent('Lead');
                     }
                     if (typeof window.gtag === 'function') {
                       window.gtag('event', 'generate_lead', {
@@ -731,6 +746,7 @@
                     } catch (e) {}
                     if (typeof window.fbq === 'function') {
                       window.fbq('track', 'Lead');
+                      reportMetaEvent('Lead');
                     }
                     if (typeof window.gtag === 'function') {
                       window.gtag('event', 'generate_lead', {
@@ -781,6 +797,7 @@
 
                     // Cloaking suppression removed to ensure Meta Pixel tracking
                     if (typeof window.fbq === 'function') {
+                      reportMetaEvent('InitiateCheckout');
                       window.fbq('track', 'InitiateCheckout', {
                         value: amount,
                         currency: 'BRL',
