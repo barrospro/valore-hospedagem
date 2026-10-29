@@ -772,6 +772,19 @@ async function handleApi(req, res, url) {
     });
   }
 
+  if (pathname === '/api/push/stats' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const period = searchParams.get('period') || 'day';
+    try {
+      await pushService.hydrateFromSupabase();
+      const stats = pushAdmin.getPushStats(period);
+      return sendJson(req, res, 200, { ok: true, ...stats });
+    } catch (e) {
+      return fail(req, res, 500, e.message);
+    }
+  }
+
   if (pathname === '/api/integrations' && method === 'GET') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
