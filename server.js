@@ -1259,6 +1259,20 @@ async function handleApi(req, res, url) {
     });
   }
 
+  if (pathname === '/api/track-meta-event' && method === 'POST') {
+    // Endpoint público para o frontend reportar eventos disparados
+    try {
+      const body = await readJson(req);
+      const pixelId = String(body.pixelId || '').trim();
+      const event = String(body.event || '').trim();
+      if (pixelId && event) {
+        trackMetaEvent(pixelId, event, 'frontend');
+        return sendJson(req, res, 200, { ok: true });
+      }
+    } catch (e) {}
+    return sendJson(req, res, 200, { ok: false });
+  }
+
   if (pathname === '/api/meta-events' && method === 'GET') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');

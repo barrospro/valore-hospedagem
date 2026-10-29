@@ -788,6 +788,7 @@
                         content_ids: [order.id],
                         content_type: 'product'
                       }, { eventID: 'ic_' + order.id });
+                      reportMetaEvent('AddPaymentInfo');
                       window.fbq('track', 'AddPaymentInfo', {
                         value: amount,
                         currency: 'BRL',
