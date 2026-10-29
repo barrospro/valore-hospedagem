@@ -2591,6 +2591,21 @@ async function handleApi(req, res, url) {
     });
   }
 
+  /* -------------------------- novos endpoints de stats ----------------------- */
+  if (pathname === '/api/gateway-stats' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    try { await store.hydrateFromSupabase(); } catch {}
+    return sendJson(req, res, 200, store.gatewayStats());
+  }
+  if (pathname === '/api/audit-diff' && method === 'POST') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    const body = await readJson(req);
+    const entry = admin.addAuditWithDiff(body.action, body.oldVal, body.newVal, ip);
+    return sendJson(req, res, 201, entry);
+  }
+
   return fail(req, res, 404, `Rota não encontrada: ${method} ${pathname}`);
 }
 
@@ -2808,6 +2823,7 @@ if (require.main === module) {
   process.on('unhandledRejection', (e) => console.error('[unhandledRejection]', e));
   process.on('uncaughtException', (e) => { console.error('[uncaughtException]', e); store.flushNow(); });
 }
+
 
 handler.server = server;
 handler.handleApi = handleApi;
