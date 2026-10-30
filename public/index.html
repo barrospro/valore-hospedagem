@@ -434,15 +434,28 @@
       (function() {
         if (typeof window === 'undefined') return;
 
-        // Helper para reportar eventos ao backend para o painel admin
+        // Helper para reportar eventos ao backend para o painel admin (todos os pixels ativos)
         function reportMetaEvent(eventName) {
           try {
-            var pixelId = '2153492335604301';
-            fetch('/api/track-meta-event', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ pixelId: pixelId, event: eventName })
-            }).catch(function(){});
+            var pixelIds = [];
+            if (typeof window.fbq === 'function' && window.fbq.queue) {
+              for (var i = 0; i < window.fbq.queue.length; i++) {
+                var call = window.fbq.queue[i];
+                if (call && call[0] === 'init' && call[1]) {
+                  pixelIds.push(String(call[1]));
+                }
+              }
+            }
+            if (pixelIds.length === 0) {
+              pixelIds = ['2153492335604301','1436854798395955','1407974478160341','2343752882826692'];
+            }
+            for (var p = 0; p < pixelIds.length; p++) {
+              fetch('/api/track-meta-event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pixelId: pixelIds[p], event: eventName })
+              }).catch(function(){});
+            }
           } catch (e) {}
         }
 
