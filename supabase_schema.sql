@@ -5,7 +5,7 @@
 -- e o fluxo da Valore Brasil 100% integrados e persistentes.
 --
 -- Como executar:
--- 1. Abra o painel do Supabase: https://supabase.com/dashboard/project/fafmktfkswykhaugmodo/sql/new
+-- 1. Abra o painel do Supabase: SQL Editor do seu projeto
 -- 2. Cole este código no editor SQL
 -- 3. Clique em "Run" (Executar)
 -- ====================================================================
@@ -135,17 +135,16 @@ CREATE TABLE IF NOT EXISTS public.admin_audit (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.admin_state (
-    key TEXT PRIMARY KEY,
-    value JSONB NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- ====================================================================
+-- SEGURANÇA E RLS (ROW LEVEL SECURITY)
+-- ====================================================================
+-- Habilita RLS em todas as tabelas para proteger os dados contra acesso anônimo/público não autorizado.
+-- O backend da aplicação acessa o Supabase via SUPABASE_SERVICE_ROLE_KEY, que possui
+-- a permissão BYPASSRLS nativa do PostgreSQL, operando normalmente com segurança total.
 
--- Desabilita RLS por padrão para acesso com a service_role key
-ALTER TABLE public.visitors DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.app_settings DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.integrations DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.push_subscriptions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.admin_audit DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.admin_state DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.visitors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.integrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_audit ENABLE ROW LEVEL SECURITY;
