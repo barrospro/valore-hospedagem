@@ -1660,6 +1660,21 @@ async function handleApi(req, res, url) {
     const limit = Number(searchParams.get('limit')) || 20;
     const offset = Number(searchParams.get('offset')) || 0;
 
+    if (config.supabase?.configured) {
+      try {
+        const sbRes = await supabase.listVisitorsWithCount({ limit, offset, stage: status, search: q });
+        if (sbRes && Array.isArray(sbRes.items)) {
+          return sendJson(req, res, 200, {
+            items: sbRes.items,
+            total: sbRes.total,
+            hasMore: offset + limit < sbRes.total,
+          });
+        }
+      } catch (err) {
+        console.warn('[visitors] Falha ao buscar lista do Supabase, usando fallback em memória:', err.message);
+      }
+    }
+
     let all = store.listVisitors();
     if (q) {
       all = all.filter((v) => (v.name && v.name.toLowerCase().includes(q)) || (v.cpf && v.cpf.includes(q)) || (v.phone && v.phone.includes(q)) || (v.email && v.email.toLowerCase().includes(q)) || (v.id && v.id.includes(q)));
@@ -1945,6 +1960,20 @@ async function handleApi(req, res, url) {
         channel: order.channel || (order.isCloaked || order.gatewayAccount === 'secondary' ? 'cloaked' : 'standard'),
         isCloaked: !!(order.isCloaked || order.gatewayAccount === 'secondary'),
       });
+    }
+
+    /* Fallback para instâncias serverless (Vercel) via Supabase */
+    if (!order && config.supabase?.configured) {
+      try {
+        order = await supabase.getOrder(orderId);
+        if (order) {
+          const d = store.load();
+          d.orders[order.id] = order;
+          store.flush();
+        }
+      } catch (e) {
+        console.warn('[orders] Falha ao buscar ordem no Supabase:', e.message);
+      }
     }
 
     /* Fallback para instâncias serverless (Vercel) via BSPay */
@@ -2367,6 +2396,12 @@ async function handleApi(req, res, url) {
       || String(payload.event || '').toLowerCase().includes('paid');
 
     if (order && isPaid) {
+      const confirmed = await confirmOnGateway(order, txId);
+      if (!confirmed) {
+        console.warn('[webhook-nitropay] Pagamento não confirmado na consulta direta à NitroPay');
+        return sendJson(req, res, 200, { received: true, verified: false, confirmed: false });
+      }
+
       store.completeOrder(order.id, 'nitropay-webhook', payload);
       const updated = store.getOrder(order.id) || order;
       updated.status = 'COMPLETED';
