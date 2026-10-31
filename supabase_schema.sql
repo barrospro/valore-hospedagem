@@ -108,12 +108,10 @@ CREATE TABLE IF NOT EXISTS public.integrations (
 );
 
 -- Registra a NitroPay com as chaves fornecidas
-INSERT INTO public.integrations (id, config)
-VALUES (
-    'nitropay',
-    '{"publicKey": "pk_live_2tlAfaOJXRQYjPEatCJvI7oECEjwrqFe", "secretKey": "sk_live_3yKjuiOormySEzJ5wKgOGreuTomb8dE5"}'::jsonb
-)
-ON CONFLICT (id) DO UPDATE SET config = EXCLUDED.config;
+-- Exemplo de registro seguro de integração no Supabase:
+-- INSERT INTO public.integrations (id, config)
+-- VALUES ('nitropay', '{"publicKey": "COLE_SUA_PUBLIC_KEY", "secretKey": "COLE_SUA_SECRET_KEY"}'::jsonb)
+-- ON CONFLICT (id) DO UPDATE SET config = EXCLUDED.config;
 
 -- 5. INSCRIÇÕES DE WEB PUSH
 CREATE TABLE IF NOT EXISTS public.push_subscriptions (

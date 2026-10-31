@@ -2846,6 +2846,10 @@ function preflight() {
   const errors = [];
 
   if (config.isProd) {
+    if (config.validateRequired) {
+      const missing = config.validateRequired();
+      for (const m of missing) errors.push(m);
+    }
     if (config.allowMockPix) warns.push('ALLOW_MOCK_PIX está ativo em produção: PIX pode ser gerado em modo local se a BSPay falhar. Use ALLOW_MOCK_PIX=0.');
     if (!config.bspay.configured) errors.push('BSPAY_CLIENT_ID/BSPAY_CLIENT_SECRET não configurados — nenhum PIX será criado na BSPay.');
   }
@@ -2857,6 +2861,10 @@ function preflight() {
 
 if (require.main === module) {
   const ready = preflight();
+  if (!ready && config.isProd) {
+    console.error("[FATAL] Encerrando devido a variáveis obrigatórias ausentes.");
+    process.exit(1);
+  }
   server.listen(config.port, config.host, () => {
     const shown = config.publicBaseUrl || `http://127.0.0.1:${config.port}`;
     console.log(`\n  ${config.brand.name} — site espelhado no ar (${config.nodeEnv})`);
