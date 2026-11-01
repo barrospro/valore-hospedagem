@@ -1011,7 +1011,7 @@ Error generating stack: `+m.message+`
         })
       ]})
     ]})}),
-    isCardModalOpen&&i.jsx(we.div,{className:"fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:()=>setIsCardModalOpen(!1),children:i.jsxs(we.div,{role:"dialog","aria-modal":"true","aria-label":"Solicitar Cartão de Crédito Valore",className:"bg-[#0f1712] border border-white/10 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4 text-white",initial:{y:60,opacity:0},animate:{y:0,opacity:1},exit:{y:60,opacity:0},onClick:ev=>ev.stopPropagation(),children:[
+    isCardModalOpen&&i.jsx(we.div,{className:"fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:()=>setIsCardModalOpen(!1),children:i.jsxs(we.div,{role:"dialog","aria-modal":"true","aria-label":"Solicitar Cartão de Crédito Valore",className:"bg-[#0f1712] border border-white/10 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4 text-white",initial:{y:60,opacity:0},animate:{y:0,opacity:1},exit:{y:60,opacity:0},onClick:ev=>ev.stopPropagation(),children:[
       i.jsxs("div",{className:"flex items-center justify-between pb-1",children:[
         i.jsxs("div",{children:[
           i.jsx("p",{className:"text-xs font-bold uppercase tracking-wider text-[#b4f045]",children:"Crédito Rotativo Pré-Aprovado"}),
@@ -1022,29 +1022,32 @@ Error generating stack: `+m.message+`
 
       cardModalStep==="input"&&i.jsxs("div",{className:"space-y-4",children:[
         i.jsxs("div",{
-          className:"relative w-full rounded-2xl p-5 overflow-hidden shadow-2xl border border-white/15",
+          className:"relative w-full rounded-2xl p-4 sm:p-5 overflow-hidden shadow-2xl border border-white/15",
           style:{background:"linear-gradient(135deg, #18221c 0%, #0d1410 60%, #152219 100%)",boxShadow:"0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)"},
           children:[
             i.jsx("div",{className:"absolute -top-12 -right-12 w-36 h-36 rounded-full blur-[40px] pointer-events-none",style:{backgroundColor:"rgba(180, 240, 69, 0.2)"}}),
-            i.jsxs("div",{className:"flex items-center justify-between relative z-10 mb-4",children:[
+            i.jsxs("div",{className:"flex items-center justify-between relative z-10 mb-3",children:[
               i.jsxs("div",{className:"flex items-baseline gap-1",children:[
                 i.jsx("span",{className:"text-lg font-black tracking-tighter text-white",children:"valore"}),
                 i.jsx("span",{className:"w-1.5 h-1.5 rounded-full bg-[#b4f045]"})
               ]}),
               i.jsx("span",{className:"text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full",style:{backgroundColor:"rgba(180, 240, 69, 0.15)",color:"#b4f045",border:"1px solid rgba(180, 240, 69, 0.3)"},children:"BLACK"})
             ]}),
-            i.jsxs("div",{className:"flex items-center gap-3 relative z-10 mb-5",children:[
-              i.jsx("div",{className:"w-10 h-7 rounded-md border border-amber-300/40 relative overflow-hidden",style:{background:"linear-gradient(135deg, #eab308 0%, #ca8a04 100%)"},children:i.jsx("div",{className:"absolute inset-0 opacity-40 bg-[radial-gradient(#713f12_1px,transparent_1px)] [background-size:4px_4px]"})}),
-              i.jsx("span",{className:"text-white/60 text-sm tracking-wider font-mono",children:"‹‹‹‹"})
+            i.jsxs("div",{className:"flex items-center justify-between relative z-10 mb-3",children:[
+              i.jsxs("div",{className:"flex items-center gap-2.5",children:[
+                i.jsx("div",{className:"w-9 h-6.5 rounded-md border border-amber-300/40 relative overflow-hidden",style:{background:"linear-gradient(135deg, #eab308 0%, #ca8a04 100%)"},children:i.jsx("div",{className:"absolute inset-0 opacity-40 bg-[radial-gradient(#713f12_1px,transparent_1px)] [background-size:4px_4px]"})}),
+                i.jsx("span",{className:"text-white/60 text-xs tracking-wider font-mono",children:"‹‹‹‹"})
+              ]}),
+              i.jsx("p",{className:"text-sm sm:text-base font-black font-mono tracking-widest text-white/90",children:"•••• •••• •••• 8492"})
             ]}),
             i.jsxs("div",{className:"flex items-end justify-between relative z-10 pt-2 border-t border-white/10",children:[
-              i.jsxs("div",{children:[
+              i.jsxs("div",{className:"min-w-0 pr-2",children:[
                 i.jsx("p",{className:"text-[9px] uppercase tracking-wider text-white/50",children:"Titular do Cartão"}),
-                i.jsx("p",{className:"text-xs font-bold font-mono tracking-wider text-white truncate max-w-[190px]",children:(r?r.toUpperCase():"CLIENTE VALORE")})
+                i.jsx("p",{className:"text-xs font-bold font-mono tracking-wider text-white truncate max-w-[220px]",children:(rawCustomerName?rawCustomerName.toUpperCase():"CLIENTE VALORE")})
               ]}),
-              i.jsxs("div",{className:"flex -space-x-2 shrink-0 opacity-80",children:[
-                i.jsx("div",{className:"w-5 h-5 rounded-full bg-red-500/90"}),
-                i.jsx("div",{className:"w-5 h-5 rounded-full bg-amber-500/90"})
+              i.jsxs("div",{className:"flex items-center -space-x-2 shrink-0",children:[
+                i.jsx("div",{className:"w-5 h-5 rounded-full bg-[#eb001b] opacity-90 shadow-sm"}),
+                i.jsx("div",{className:"w-5 h-5 rounded-full bg-[#f79e1b] opacity-90 shadow-sm"})
               ]})
             ]})
           ]
@@ -1059,35 +1062,33 @@ Error generating stack: `+m.message+`
             i.jsx("input",{
               type:"text",
               inputMode:"numeric",
+              pattern:"[0-9]*",
+              autoComplete:"off",
               value:cardInputLimit?("R$ "+parseInt(cardInputLimit,10).toLocaleString("pt-BR")+",00"):"R$ 0,00",
+              onFocus:ev=>{
+                if(!cardInputLimit)ev.target.select();
+              },
               onChange:ev=>{
                 const val=ev.target.value.replace(/\D/g,"");
                 setCardInputLimit(val);
               },
               placeholder:"R$ 0,00",
-              className:"w-full h-14 rounded-2xl bg-white/5 border border-white/15 px-4 text-xl font-black font-mono text-[#b4f045] focus:outline-none focus:border-[#b4f045] transition-all"
+              className:"w-full h-14 rounded-2xl bg-white/5 border border-white/20 px-4 text-xl font-black font-mono text-[#b4f045] focus:outline-none focus:border-[#b4f045] focus:ring-1 focus:ring-[#b4f045] transition-all"
             })
           }),
-          i.jsx("p",{className:"text-[11px] text-white/50",children:"Informe o limite desejado para compras no crédito rotativo e saques."}),
-          i.jsx("div",{className:"flex gap-2 pt-1",children:[
-            ["1000","R$ 1.000"],
-            ["2500","R$ 2.500"],
-            ["3800","R$ 3.800"],
-            ["5000","R$ 5.000"]
-          ].map(([val,lbl])=>i.jsx("button",{
-            key:val,
-            type:"button",
-            onClick:()=>setCardInputLimit(val),
-            className:"flex-1 py-1.5 rounded-lg text-xs font-bold transition-all "+(cardInputLimit===val?"bg-[#b4f045] text-[#0f1712]":"bg-white/5 text-white/70 hover:bg-white/10 border border-white/10"),
-            children:lbl
-          }))})
+          i.jsx("p",{className:"text-[11px] text-white/50",children:"Informe o limite desejado para compras no crédito rotativo e saques."})
         ]}),
 
         i.jsxs("button",{
           type:"button",
           onClick:handleRequestLimit,
           disabled:rawRequestedLimit<=0,
-          className:re("w-full py-4 px-5 rounded-2xl font-black text-sm tracking-tight flex items-center justify-center gap-2 shadow-xl transition-all mt-2",rawRequestedLimit>0?"bg-[#b4f045] hover:bg-[#a2dc3c] text-[#0f1712] cursor-pointer active:scale-[0.99]":"bg-white/10 text-white/30 cursor-not-allowed"),
+          className:re(
+            "w-full py-4 px-5 rounded-2xl font-black text-sm tracking-tight flex items-center justify-center gap-2 shadow-xl transition-all mt-3",
+            rawRequestedLimit>0
+              ? "bg-[#b4f045] hover:bg-[#a2dc3c] text-[#0f1712] shadow-[#b4f045]/25 shadow-lg cursor-pointer active:scale-[0.98]"
+              : "bg-white/10 text-white/40 border border-white/10 cursor-not-allowed"
+          ),
           children:[
             "Solicitar Limite de Crédito",
             i.jsx(xm,{size:18})
