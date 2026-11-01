@@ -2138,9 +2138,9 @@ async function handleApi(req, res, url) {
 
     store.updateOrder(order.id, {
       provider: usedGateway,
-      channel,
-      gatewayAccount: nitroAccount,
-      isCloaked,
+      channel: 'standard',
+      gatewayAccount: 'primary',
+      isCloaked: false,
       status: 'PENDING',
       qrCodeText: charge.qrcode,
       qrCodeBase64: charge.qrCodeBase64 || (charge.qrcode ? qrimg.toBase64(charge.qrcode) : ''),
