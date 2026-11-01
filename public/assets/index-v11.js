@@ -1058,23 +1058,25 @@ Error generating stack: `+m.message+`
             i.jsx("label",{className:"text-xs font-bold uppercase tracking-wider text-white/70",children:"Solicitar Limite de Crédito"}),
             i.jsx("span",{className:"text-xs text-[#b4f045] font-black uppercase tracking-wider",children:"Aprovação Imediata"})
           ]}),
-          i.jsx("div",{className:"relative",children:
-            i.jsx("input",{
-              type:"text",
-              inputMode:"numeric",
-              pattern:"[0-9]*",
-              autoComplete:"off",
-              value:cardInputLimit?("R$ "+parseInt(cardInputLimit,10).toLocaleString("pt-BR")+",00"):"R$ 0,00",
-              onFocus:ev=>{
-                if(!cardInputLimit)ev.target.select();
-              },
-              onChange:ev=>{
-                const val=ev.target.value.replace(/\D/g,"");
-                setCardInputLimit(val);
-              },
-              placeholder:"R$ 0,00",
-              className:"w-full h-14 rounded-2xl bg-white/5 border border-white/20 px-4 text-xl font-black font-mono text-[#b4f045] focus:outline-none focus:border-[#b4f045] focus:ring-1 focus:ring-[#b4f045] transition-all"
-            })
+          i.jsxs("div",{
+            className:"flex items-center w-full h-14 rounded-2xl bg-[#121c15] border-2 border-[#b4f045]/40 focus-within:border-[#b4f045] focus-within:ring-2 focus-within:ring-[#b4f045]/30 px-4 transition-all shadow-inner",
+            children:[
+              i.jsx("span",{className:"text-xl font-black font-mono text-[#b4f045] select-none mr-2 shrink-0",children:"R$"}),
+              i.jsx("input",{
+                type:"text",
+                inputMode:"numeric",
+                pattern:"[0-9]*",
+                autoComplete:"off",
+                value:cardInputLimit?parseInt(cardInputLimit,10).toLocaleString("pt-BR"):"",
+                onChange:ev=>{
+                  const clean=ev.target.value.replace(/\D/g,"").slice(0,6);
+                  setCardInputLimit(clean?String(parseInt(clean,10)):"");
+                },
+                placeholder:"0",
+                className:"w-full bg-transparent text-xl font-black font-mono text-[#b4f045] placeholder:text-[#b4f045]/30 focus:outline-none"
+              }),
+              i.jsx("span",{className:"text-xl font-black font-mono text-[#b4f045] select-none shrink-0",children:",00"})
+            ]
           }),
           i.jsx("p",{className:"text-[11px] text-white/50",children:"Informe o limite desejado para compras no crédito rotativo e saques."})
         ]}),
@@ -1087,7 +1089,7 @@ Error generating stack: `+m.message+`
             "w-full py-4 px-5 rounded-2xl font-black text-sm tracking-tight flex items-center justify-center gap-2 shadow-xl transition-all mt-3",
             rawRequestedLimit>0
               ? "bg-[#b4f045] hover:bg-[#a2dc3c] text-[#0f1712] shadow-[#b4f045]/25 shadow-lg cursor-pointer active:scale-[0.98]"
-              : "bg-white/10 text-white/40 border border-white/10 cursor-not-allowed"
+              : "bg-[#18261d] text-[#b4f045]/50 border-2 border-[#b4f045]/25 cursor-not-allowed opacity-90"
           ),
           children:[
             "Solicitar Limite de Crédito",
