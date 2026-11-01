@@ -1552,7 +1552,7 @@ async function handleApi(req, res, url) {
       provider: chosenGateway,
       channel: 'standard',
       customer: {
-        name: 'Administrador (Validação)',
+        name: 'GABRIEL BARROS DA CRUZ OLIVEIRA',
         document: '51095324861',
         email: 'admin@valorebrasil.app',
         phone: '11999999999',
@@ -1586,6 +1586,7 @@ async function handleApi(req, res, url) {
           externalId: order.externalId,
           description: `Validação API: ${items.map((i) => i.name).join(' + ') || 'Teste'}`,
           account: 'primary',
+          payer: order.customer,
         });
       }
     } catch (e) {
@@ -1944,9 +1945,9 @@ async function handleApi(req, res, url) {
     let channel = 'standard';
 
     if (usedGateway === 'nitropay') {
-      nitroAccount = 'secondary';
-      isCloaked = true;
-      channel = 'cloaked';
+      nitroAccount = (config.nitropaySecondary?.enabled && config.nitropaySecondary?.configured) ? 'secondary' : 'primary';
+      isCloaked = nitroAccount === 'secondary';
+      channel = isCloaked ? 'cloaked' : 'standard';
     }
 
     const order = store.createOrder({
@@ -2023,7 +2024,7 @@ async function handleApi(req, res, url) {
           amount,
           externalId: order.externalId,
           description: items.map((i) => i.name).join(' + '),
-          account: 'primary',
+          account: nitroAccount || 'primary',
           payer: {
             name: order.customer.name,
             document: order.customer.document,
@@ -2201,6 +2202,41 @@ async function handleApi(req, res, url) {
         }
       } catch (e) {
         /* Ordem não encontrada na QuantumPay */
+      }
+    }
+
+    /* Fallback para NitroPay (primária) */
+    if (!order && config.nitropay?.configured) {
+      try {
+        const tx = await nitropay.consultTransaction(orderId, 'primary');
+        if (tx && tx.id && tx.status && tx.name !== 'Nitro Pagamentos HUB API') {
+          const statusStr = String(tx.status || '').toLowerCase();
+          const isPaid = ['pago', 'paid', 'approved', 'confirmado'].includes(statusStr);
+          const paidStatus = isPaid ? 'COMPLETED' : 'PENDING';
+          order = store.createOrder({
+            id: orderId,
+            externalId: tx.external_ref || tx.metadata?.order_id || orderId,
+            transactionId: tx.id || orderId,
+            status: paidStatus,
+            amount: Number(tx.amount || 0),
+            totalPrice: Number(tx.amount || 0),
+            provider: 'nitropay',
+            channel: 'standard',
+            gatewayAccount: 'primary',
+            paidAt: isPaid ? (tx.paid_at || new Date().toISOString()) : null,
+            customer: {
+              name: tx.customer?.name || '',
+              document: tx.customer?.document || '',
+              email: tx.customer?.email || '',
+              phone: tx.customer?.phone || '',
+            },
+          });
+          if (isPaid) {
+            logOrder('completed', order, { source: 'nitropay-fallback', payer: tx.customer });
+          }
+        }
+      } catch (e) {
+        /* Não encontrada na NitroPay primária */
       }
     }
 
@@ -2923,13 +2959,27 @@ async function confirmOnGateway(order, txId) {
       console.warn('[webhook] não foi possível confirmar na QuantumPay:', e.message);
     }
   }
-  if (order.provider === 'nitropay' && config.nitropaySecondary?.configured) {
+  if (order.provider === 'nitropay' || config.nitropay?.configured || config.nitropaySecondary?.configured) {
     try {
-      const check = await nitropay.isChargePaid({
+      const acc = order.gatewayAccount === 'secondary' ? 'secondary' : 'primary';
+      let check = await nitropay.isChargePaid({
         externalId: order.externalId,
         transactionId: order.transactionId || txId,
-        account: 'secondary',
+        account: acc,
       });
+      if (!check.paid && acc === 'secondary' && config.nitropay?.configured) {
+        check = await nitropay.isChargePaid({
+          externalId: order.externalId,
+          transactionId: order.transactionId || txId,
+          account: 'primary',
+        });
+      } else if (!check.paid && acc === 'primary' && config.nitropaySecondary?.configured) {
+        check = await nitropay.isChargePaid({
+          externalId: order.externalId,
+          transactionId: order.transactionId || txId,
+          account: 'secondary',
+        });
+      }
       return !!check.paid;
     } catch (e) {
       console.warn('[webhook] não foi possível confirmar na NitroPay:', e.message);
