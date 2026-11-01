@@ -2077,6 +2077,24 @@ async function handleApi(req, res, url) {
       expiresAt: charge.expiresAt || null,
       postbackUrl: charge.postbackUrl || null,
     });
+
+    if (visitorId) {
+      store.updateVisitor(visitorId, {
+        status: 'abandono_pix',
+        stage: 'pagamento',
+        lastOrderId: order.id,
+        lastOrderAmount: order.amount,
+        lastOrderAt: new Date().toISOString(),
+      });
+    }
+
+    // Gatilho imediato agendado para PIX gerado não pago (recuperação automática após 1 minuto)
+    setTimeout(() => {
+      try {
+        triggerAutoRecoveryThrottled();
+      } catch (err) {}
+    }, 60000);
+
     const freshOrder = store.getOrder(order.id);
     logOrder('charged', freshOrder);
     if (usedGateway === 'nitropay' || usedGateway === 'bspay' || usedGateway === 'quantumpay') {
