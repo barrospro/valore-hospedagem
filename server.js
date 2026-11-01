@@ -1603,9 +1603,13 @@ async function handleApi(req, res, url) {
       store.applyIntegrationConfig(chosenGateway, { ...inputConfig, provider });
     }
 
+    await products.loadCustomProducts();
     const productId = body.productId || body.data?.productId || 'seguro-plus';
     const items = products.resolveItems(productId, []);
-    const amount = items.length ? products.totalOf(items) : 27.97;
+    let amount = items.length ? products.totalOf(items) : (Number(body.amount || body.price) || 2.99);
+    if (body.amount && Number(body.amount) > 0) {
+      amount = Number(body.amount);
+    }
 
     const isConfigured = (provider === 'bspay' && config.bspay.configured) ||
                          (provider === 'quantumpay' && config.quantumpay.configured) ||
