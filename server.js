@@ -355,6 +355,79 @@ function markSynced(id) {
 
 /* ----------------------------------- API ---------------------------------- */
 
+
+/** Executa a emissão de cobrança PIX no gateway indicado usando as credenciais do painel/Supabase */
+async function executePixCharge(gatewayId, order, items, req) {
+  const gw = String(gatewayId || '').toLowerCase().trim();
+  const storedIntegrations = store.getIntegrations() || {};
+  const gwConfig = storedIntegrations[gw] || {};
+  const provider = String(gwConfig.provider || gw).toLowerCase();
+
+  // Aplica as credenciais mais recentes salvas no painel/Supabase
+  store.applyIntegrationConfig(gw, gwConfig);
+
+  const desc = items.map((i) => i.name).join(' + ') || 'Taxa de Emissao de Contrato - Valore';
+
+  if (provider === 'bspay' || gw === 'bspay') {
+    if (!config.bspay?.configured) {
+      throw new Error('Gateway BSPay não está configurado com Client ID e Client Secret no painel.');
+    }
+    const charge = await bspay.createPixCharge({
+      amount: order.amount,
+      externalId: order.externalId,
+      description: desc,
+      postbackUrl: postbackFromRequest(req, 'bspay'),
+      payer: {
+        name: order.customer.name,
+        document: order.customer.document,
+        email: order.customer.email,
+        phone: order.customer.phone,
+      },
+    });
+    return { charge, provider: 'bspay' };
+  }
+
+  if (provider === 'nitropay' || gw === 'nitropay') {
+    if (!config.nitropay?.configured) {
+      throw new Error('Gateway NitroPay não está configurado com chaves no painel.');
+    }
+    const charge = await nitropay.createPixCharge({
+      amount: order.amount,
+      externalId: order.externalId,
+      description: desc,
+      postbackUrl: postbackFromRequest(req, 'nitropay'),
+      payer: {
+        name: order.customer.name,
+        document: order.customer.document,
+        email: order.customer.email,
+        phone: order.customer.phone,
+      },
+    });
+    return { charge, provider: 'nitropay' };
+  }
+
+  if (provider === 'quantumpay' || gw === 'quantumpay') {
+    if (!config.quantumpay?.configured) {
+      throw new Error('Gateway QuantumPay não está configurado no painel.');
+    }
+    const charge = await quantumpay.createPixCharge({
+      amount: order.amount,
+      externalId: order.externalId,
+      description: desc,
+      postbackUrl: postbackFromRequest(req, 'quantumpay'),
+      payer: {
+        name: order.customer.name,
+        document: order.customer.document,
+        email: order.customer.email,
+        phone: order.customer.phone,
+      },
+    });
+    return { charge, provider: 'quantumpay' };
+  }
+
+  throw new Error(`Provedor '${provider}' desconhecido para o gateway '${gw}'`);
+}
+
 async function handleApi(req, res, url) {
   const { pathname, searchParams } = url;
   const method = req.method.toUpperCase();
@@ -938,8 +1011,9 @@ async function handleApi(req, res, url) {
 
     const stored = store.getIntegrations() || {};
     const settings = store.getSettings() || {};
-    const deletedIds = (store.getDeletedIntegrations() || []).map(x => String(x).toLowerCase());
     const activeGatewayId = String(settings.activeGatewayId || 'nitropay').toLowerCase();
+    const secondaryGatewayId = String(settings.secondaryGatewayId || 'bspay').toLowerCase();
+    const deletedIds = (store.getDeletedIntegrations() || []).map(x => String(x).toLowerCase());
 
     const builtIns = [
       {
@@ -948,15 +1022,16 @@ async function handleApi(req, res, url) {
         category: 'Pagamento',
         group: 'gateway',
         provider: 'nitropay',
-        description: 'Gateway de pagamentos Pix NitroPay (chave pública e privada).',
+        description: 'Gateway de pagamentos Pix NitroPay oficial (chave pública e privada).',
         isCustom: false,
         isActiveCheckout: (activeGatewayId === 'nitropay'),
+        isSecondaryCheckout: (secondaryGatewayId === 'nitropay'),
         webhookActive: stored.nitropay?.webhookActive !== false,
         webhookUrl: postbackFromRequest(req, 'nitropay'),
         lastWebhookSync: stored.nitropay?.lastWebhookSync || null,
         config: {
-          publicKey: stored.nitropay?.publicKey || config.nitropaySecondary?.publicKey || config.nitropay?.publicKey || '',
-          secretKey: stored.nitropay?.secretKey || config.nitropaySecondary?.secretKey || config.nitropay?.secretKey || '',
+          publicKey: stored.nitropay?.publicKey || config.nitropay?.publicKey || '',
+          secretKey: stored.nitropay?.secretKey || config.nitropay?.secretKey || '',
         },
       },
       {
@@ -965,9 +1040,10 @@ async function handleApi(req, res, url) {
         category: 'Pagamento',
         group: 'gateway',
         provider: 'bspay',
-        description: 'Gateway Pix BSPay com confirmação automática.',
+        description: 'Gateway Pix BSPay oficial (Client ID e Client Secret).',
         isCustom: false,
         isActiveCheckout: (activeGatewayId === 'bspay'),
+        isSecondaryCheckout: (secondaryGatewayId === 'bspay'),
         webhookActive: stored.bspay?.webhookActive !== false,
         webhookUrl: postbackFromRequest(req, 'bspay'),
         lastWebhookSync: stored.bspay?.lastWebhookSync || null,
@@ -985,6 +1061,7 @@ async function handleApi(req, res, url) {
         description: 'Gateway Pix QuantumPay para geração e baixa de cobranças.',
         isCustom: false,
         isActiveCheckout: (activeGatewayId === 'quantumpay'),
+        isSecondaryCheckout: (secondaryGatewayId === 'quantumpay'),
         webhookActive: stored.quantumpay?.webhookActive !== false,
         webhookUrl: postbackFromRequest(req, 'quantumpay'),
         lastWebhookSync: stored.quantumpay?.lastWebhookSync || null,
@@ -1043,7 +1120,11 @@ async function handleApi(req, res, url) {
       },
     ];
 
-    const result = builtIns.filter(item => !deletedIds.includes(item.id.toLowerCase()));
+    // NitroPay e BSPay nunca são filtrados para garantir controle total no painel
+    const result = builtIns.filter(item => {
+      if (['nitropay', 'bspay'].includes(item.id.toLowerCase())) return true;
+      return !deletedIds.includes(item.id.toLowerCase());
+    });
 
     // Gateways customizados adicionados pelo usuário
     for (const [key, val] of Object.entries(stored)) {
@@ -1060,6 +1141,7 @@ async function handleApi(req, res, url) {
           description: val.description || `Gateway Pix ${prov.toUpperCase()} customizado.`,
           isCustom: true,
           isActiveCheckout: (activeGatewayId === key),
+          isSecondaryCheckout: (secondaryGatewayId === key),
           webhookActive: val.webhookActive !== false,
           webhookUrl: postbackFromRequest(req, key),
           lastWebhookSync: val.lastWebhookSync || null,
@@ -1682,7 +1764,10 @@ async function handleApi(req, res, url) {
 
   /* --------------------------------- settings ------------------------------- */
   if (pathname === '/api/settings') {
-    if (method === 'GET') return sendJson(req, res, 200, store.getSettings());
+    if (method === 'GET') {
+      try { await store.loadIntegrationsFromSupabase(); } catch {}
+      return sendJson(req, res, 200, store.getSettings());
+    }
     if (method === 'PUT' || method === 'POST') {
       const token = admin.extractToken(req);
       if (config.isProd && !admin.getSessionByToken(token)) {
@@ -1691,7 +1776,7 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       const data = body.data || body;
       const updated = store.setSettings(data);
-      admin.addAudit('settings_change', `Gateway ativo alterado para ${data.activeGatewayId || 'padrão'}`, ip);
+      admin.addAudit('settings_change', `Roteamento de gateways atualizado: Primário=${updated.activeGatewayId || 'nitropay'}, Secundário=${updated.secondaryGatewayId || 'nenhum'}`, ip);
       return sendJson(req, res, 200, updated);
     }
   }
@@ -1962,17 +2047,10 @@ async function handleApi(req, res, url) {
       });
     }
 
-    const chosenGateway = store.getNextGateway();
-    let usedGateway = chosenGateway;
-    let nitroAccount = null;
-    let isCloaked = false;
-    let channel = 'standard';
-
-    if (usedGateway === 'nitropay') {
-      nitroAccount = (config.nitropaySecondary?.enabled && config.nitropaySecondary?.configured) ? 'secondary' : 'primary';
-      isCloaked = nitroAccount === 'secondary';
-      channel = isCloaked ? 'cloaked' : 'standard';
-    }
+    // Carrega o roteamento de gateways configurado criteriosamente no Painel / Supabase
+    const settings = store.getSettings() || {};
+    const primaryGateway = String(settings.activeGatewayId || 'nitropay').toLowerCase();
+    const secondaryGateway = String(settings.secondaryGatewayId || 'bspay').toLowerCase();
 
     const order = store.createOrder({
       visitorId,
@@ -1983,9 +2061,8 @@ async function handleApi(req, res, url) {
       totalPrice: amount,
       externalId: makeExternalId(),
       provider: 'pending',
-      channel,
-      gatewayAccount: nitroAccount,
-      isCloaked,
+      channel: 'standard',
+      isCloaked: false,
       pushNotificationId: body.pushNotificationId || null,
       customer: {
         name: customerName,
@@ -1998,128 +2075,42 @@ async function handleApi(req, res, url) {
     logOrder('created', order);
 
     let charge = null;
-    if (usedGateway === 'bspay') {
-      try {
-        charge = await bspay.createPixCharge({
-          amount,
-          externalId: order.externalId,
-          description: items.map((i) => i.name).join(' + '),
-          postbackUrl: postbackFromRequest(req, 'bspay'),
-          payer: {
-            name: order.customer.name,
-            document: order.customer.document,
-            email: order.customer.email,
-            phone: order.customer.phone,
-          },
-        });
-      } catch (e) {
-        console.error(`[pix] BSPay falhou (${e.code || 'ERROR'}): ${e.message}`);
-        if (!config.allowMockPix) {
-          store.updateOrder(order.id, { status: 'FAILED', gatewayError: { code: e.code, message: e.message } });
-          logOrder('failed', store.getOrder(order.id), { code: e.code, message: e.message });
-          return fail(req, res, e.status || 502, 'Não foi possível gerar o PIX agora. Tente novamente.');
+    let usedGateway = primaryGateway;
+
+    // Tentativa 1: Gateway Primário (definido no painel)
+    try {
+      console.log(`[checkout] 1º Gateway (Primário selecionado no painel): ${primaryGateway}`);
+      const resPrimary = await executePixCharge(primaryGateway, order, items, req);
+      charge = resPrimary.charge;
+      usedGateway = resPrimary.provider || primaryGateway;
+    } catch (errPrimary) {
+      console.warn(`[checkout] Gateway primário (${primaryGateway}) falhou ou não respondeu: ${errPrimary.message}`);
+
+      // Tentativa 2: Gateway Secundário (Fallback definido no painel)
+      if (secondaryGateway && secondaryGateway !== 'none' && secondaryGateway !== primaryGateway) {
+        try {
+          console.log(`[checkout] 2º Gateway (Secundário/Fallback selecionado no painel): ${secondaryGateway}`);
+          const resSecondary = await executePixCharge(secondaryGateway, order, items, req);
+          charge = resSecondary.charge;
+          usedGateway = resSecondary.provider || secondaryGateway;
+          console.log(`[checkout] Cobrança gerada com sucesso via gateway secundário (${usedGateway}): ${charge.transactionId}`);
+        } catch (errSecondary) {
+          console.error(`[checkout] Gateway secundário (${secondaryGateway}) também falhou: ${errSecondary.message}`);
         }
       }
-    } else if (usedGateway === 'quantumpay') {
-      try {
-        charge = await quantumpay.createPixCharge({
-          amount,
-          externalId: order.externalId,
-          description: items.map((i) => i.name).join(' + '),
-          postbackUrl: postbackFromRequest(req, 'quantumpay'),
-          payer: {
-            name: order.customer.name,
-            document: order.customer.document,
-            email: order.customer.email,
-            phone: order.customer.phone,
-          },
-        });
-      } catch (e) {
-        console.error(`[pix] QuantumPay falhou (${e.code || 'ERROR'}): ${e.message}`);
-        if (!config.allowMockPix) {
-          store.updateOrder(order.id, { status: 'FAILED', gatewayError: { code: e.code, message: e.message } });
-          logOrder('failed', store.getOrder(order.id), { code: e.code, message: e.message });
-          return fail(req, res, e.status || 502, 'Não foi possível gerar o PIX agora. Tente novamente.');
-        }
-      }
-    } else if (usedGateway === 'nitropay') {
-      try {
-        charge = await nitropay.createPixCharge({
-          amount,
-          externalId: order.externalId,
-          description: items.map((i) => i.name).join(' + '),
-          account: nitroAccount || 'primary',
-          payer: {
-            name: order.customer.name,
-            document: order.customer.document,
-            email: order.customer.email,
-            phone: order.customer.phone,
-          },
-        });
-      } catch (e) {
-        console.error(`[pix] NitroPay falhou: ${e.message}`);
+    }
 
-        // 1. Fallback conta secundária da Nitro se primária falhou
-        if (nitroAccount === 'primary' && config.nitropaySecondary?.configured) {
-          try {
-            console.log('[pix] Tentando conta secundária da NitroPay...');
-            charge = await nitropay.createPixCharge({
-              amount,
-              externalId: order.externalId,
-              description: items.map((i) => i.name).join(' + '),
-              account: 'secondary',
-              payer: {
-                name: order.customer.name,
-                document: order.customer.document,
-                email: order.customer.email,
-                phone: order.customer.phone,
-              },
-            });
-            if (charge) {
-              order.gatewayAccount = 'secondary';
-              order.isCloaked = true;
-              order.channel = 'cloaked';
-            }
-          } catch (e2) {
-            console.error(`[pix] NitroPay secundária também falhou: ${e2.message}`);
-          }
+    if (!charge && !config.allowMockPix) {
+      store.updateOrder(order.id, {
+        status: 'FAILED',
+        gatewayError: {
+          primary: primaryGateway,
+          secondary: secondaryGateway,
+          message: 'Falha na emissão da cobrança nos gateways configurados no painel.'
         }
-
-        // 2. Failover multi-gateway automático para BSPay se NitroPay BaaS estiver oscilando
-        if (!charge && config.bspay?.configured) {
-          try {
-            console.log('[pix] Acionando failover resiliente para BSPay para manter a oferta online...');
-            charge = await bspay.createPixCharge({
-              amount,
-              externalId: order.externalId,
-              description: items.map((i) => i.name).join(' + '),
-              postbackUrl: postbackFromRequest(req, 'bspay'),
-              payer: {
-                name: order.customer.name,
-                document: order.customer.document,
-                email: order.customer.email,
-                phone: order.customer.phone,
-              },
-            });
-            if (charge) {
-              usedGateway = 'bspay';
-              order.provider = 'bspay';
-              order.gatewayAccount = null;
-              order.isCloaked = false;
-              order.channel = 'standard';
-              console.log('[pix] Ordem gerada com sucesso via failover BSPay:', charge.transactionId);
-            }
-          } catch (eBs) {
-            console.error(`[pix] BSPay failover falhou: ${eBs.message}`);
-          }
-        }
-
-        if (!charge && !config.allowMockPix) {
-          store.updateOrder(order.id, { status: 'FAILED', gatewayError: { code: e.code, message: e.message } });
-          logOrder('failed', store.getOrder(order.id), { code: e.code, message: e.message });
-          return fail(req, res, e.status || 502, 'Não foi possível gerar o PIX agora. Tente novamente.');
-        }
-      }
+      });
+      logOrder('failed', store.getOrder(order.id), { primaryGateway, secondaryGateway });
+      return fail(req, res, 502, 'Não foi possível gerar o PIX agora. Tente novamente em instantes.');
     }
 
     if (!charge && config.allowMockPix) {
@@ -3017,7 +3008,7 @@ async function handleApi(req, res, url) {
 
 /** Confirma a ordem consultando o gateway (usado quando não há webhook_secret). */
 async function confirmOnGateway(order, txId) {
-  if (order.provider === 'bspay' || config.bspay?.configured) {
+  if (order.provider === 'bspay' || (!order.provider && config.bspay?.configured)) {
     try {
       const check = await bspay.isChargePaid({
         externalId: order.externalId,
@@ -3028,7 +3019,18 @@ async function confirmOnGateway(order, txId) {
       console.warn('[webhook] não foi possível confirmar na BSPay:', e.message);
     }
   }
-  if (order.provider === 'quantumpay' || config.quantumpay?.configured) {
+  if (order.provider === 'nitropay' || (!order.provider && config.nitropay?.configured)) {
+    try {
+      const check = await nitropay.isChargePaid({
+        externalId: order.externalId,
+        transactionId: order.transactionId || txId,
+      });
+      if (check.paid) return true;
+    } catch (e) {
+      console.warn('[webhook] não foi possível confirmar na NitroPay:', e.message);
+    }
+  }
+  if (order.provider === 'quantumpay' || (!order.provider && config.quantumpay?.configured)) {
     try {
       const check = await quantumpay.isChargePaid({
         externalId: order.externalId,
@@ -3039,33 +3041,7 @@ async function confirmOnGateway(order, txId) {
       console.warn('[webhook] não foi possível confirmar na QuantumPay:', e.message);
     }
   }
-  if (order.provider === 'nitropay' || config.nitropay?.configured || config.nitropaySecondary?.configured) {
-    try {
-      const acc = order.gatewayAccount === 'secondary' ? 'secondary' : 'primary';
-      let check = await nitropay.isChargePaid({
-        externalId: order.externalId,
-        transactionId: order.transactionId || txId,
-        account: acc,
-      });
-      if (!check.paid && acc === 'secondary' && config.nitropay?.configured) {
-        check = await nitropay.isChargePaid({
-          externalId: order.externalId,
-          transactionId: order.transactionId || txId,
-          account: 'primary',
-        });
-      } else if (!check.paid && acc === 'primary' && config.nitropaySecondary?.configured) {
-        check = await nitropay.isChargePaid({
-          externalId: order.externalId,
-          transactionId: order.transactionId || txId,
-          account: 'secondary',
-        });
-      }
-      return !!check.paid;
-    } catch (e) {
-      console.warn('[webhook] não foi possível confirmar na NitroPay:', e.message);
-    }
-  }
-  return false;
+return false;
 }
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';

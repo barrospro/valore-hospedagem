@@ -2825,7 +2825,7 @@ function rqe() {
     } catch {}
   };
 
-  const handleSetActiveCheckout = async () => {
+  const handleSetPrimaryGateway = async (targetId) => {
     setIsSettingActiveCheckout(true);
     setActiveCheckoutSuccess(false);
     try {
@@ -2833,10 +2833,10 @@ function rqe() {
       const resp = await fetch("/api/settings", {
         method: "PUT",
         headers: hdrs,
-        body: JSON.stringify({ activeGatewayId: N.id })
+        body: JSON.stringify({ activeGatewayId: targetId })
       });
       if (resp.ok) {
-        setActiveCheckoutSuccess(true);
+        setActiveCheckoutSuccess("primary");
         e.invalidateQueries({ queryKey: s9() });
         e.invalidateQueries({ queryKey: l9() });
         setTimeout(() => setActiveCheckoutSuccess(false), 4000);
@@ -2845,6 +2845,28 @@ function rqe() {
       setIsSettingActiveCheckout(false);
     }
   };
+
+  const handleSetSecondaryGateway = async (targetId) => {
+    setIsSettingActiveCheckout(true);
+    setActiveCheckoutSuccess(false);
+    try {
+      const hdrs = await getAuthHeaders();
+      const resp = await fetch("/api/settings", {
+        method: "PUT",
+        headers: hdrs,
+        body: JSON.stringify({ secondaryGatewayId: targetId })
+      });
+      if (resp.ok) {
+        setActiveCheckoutSuccess("secondary");
+        e.invalidateQueries({ queryKey: s9() });
+        e.invalidateQueries({ queryKey: l9() });
+        setTimeout(() => setActiveCheckoutSuccess(false), 4000);
+      }
+    } catch {} finally {
+      setIsSettingActiveCheckout(false);
+    }
+  };
+  const handleSetActiveCheckout = () => handleSetPrimaryGateway(N.id);
 
   const handleCreateGateway = async (ev) => {
     ev.preventDefault();
@@ -2932,7 +2954,8 @@ function rqe() {
               className: re("flex items-center gap-1.5 truncate text-sm", V ? "font-medium text-foreground" : "text-foreground/85"),
               children: [
                 I.name,
-                isCurActive && i.jsx("span", { className: "rounded bg-primary/20 px-1 py-0.2 text-[9px] font-bold text-primary", children: "CHECKOUT" })
+                isCurActive && i.jsx("span", { className: "rounded bg-emerald-500/20 border border-emerald-500/40 px-1 py-0.2 text-[9px] font-bold text-emerald-400", children: "1º PRIMÁRIO" }),
+                I.isSecondaryCheckout && i.jsx("span", { className: "rounded bg-amber-500/20 border border-amber-500/40 px-1 py-0.2 text-[9px] font-bold text-amber-400", children: "2º FALLBACK" })
               ]
             }),
             i.jsx("span", { className: "block truncate text-xs text-muted-foreground", children: I.isCustom ? (I.category + " (" + I.provider + ")") : I.category })
@@ -3031,28 +3054,54 @@ function rqe() {
               isGw && i.jsxs("div", {
                 className: "flex flex-wrap items-center gap-2 shrink-0",
                 children: [
-                  !N.isActiveCheckout ? i.jsxs("button", {
+                  N.isActiveCheckout ? i.jsx("span", {
+                    className: "text-xs font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-1 rounded-md",
+                    children: "✓ 1º Gateway Primário"
+                  }) : i.jsxs("button", {
                     type: "button",
-                    onClick: handleSetActiveCheckout,
+                    onClick: () => handleSetPrimaryGateway(N.id),
                     disabled: isSettingActiveCheckout,
-                    className: "inline-flex items-center gap-1.5 rounded-md border border-card-border bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-foreground/90 hover:bg-white/[0.08] hover:text-foreground transition-all cursor-pointer",
+                    className: "inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-all cursor-pointer",
                     children: [
                       isSettingActiveCheckout && i.jsx(De, { size: 12, className: "animate-spin" }),
-                      "Usar no Checkout"
+                      "Definir como 1º Primário"
                     ]
-                  }) : i.jsx("span", {
-                    className: "text-xs font-semibold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-md",
-                    children: "Principal das Vendas"
                   }),
 
-                  (N.isCustom || N.id !== "nitropay") && i.jsxs("button", {
+                  N.isSecondaryCheckout ? i.jsxs("div", {
+                    className: "flex items-center gap-1",
+                    children: [
+                      i.jsx("span", {
+                        className: "text-xs font-bold text-amber-400 flex items-center gap-1 bg-amber-500/15 border border-amber-500/40 px-2.5 py-1 rounded-md",
+                        children: "✓ 2º Secundário (Fallback)"
+                      }),
+                      i.jsx("button", {
+                        type: "button",
+                        onClick: () => handleSetSecondaryGateway("none"),
+                        className: "text-xs text-muted-foreground hover:text-red-400 px-1 py-1 cursor-pointer",
+                        title: "Desativar Secundário",
+                        children: "✕"
+                      })
+                    ]
+                  }) : (!N.isActiveCheckout && i.jsxs("button", {
+                    type: "button",
+                    onClick: () => handleSetSecondaryGateway(N.id),
+                    disabled: isSettingActiveCheckout,
+                    className: "inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition-all cursor-pointer",
+                    children: [
+                      isSettingActiveCheckout && i.jsx(De, { size: 12, className: "animate-spin" }),
+                      "Definir como 2º Secundário"
+                    ]
+                  })),
+
+                  (N.isCustom || (!['nitropay', 'bspay'].includes(N.id))) && i.jsxs("button", {
                     type: "button",
                     onClick: handleDeleteGateway,
                     disabled: isDeletingGw,
                     className: "inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-all cursor-pointer",
                     title: "Remover este gateway",
                     children: [
-                      isDeletingGw ? i.jsx(De, { size: 12, className: "animate-spin" }) : i.jsx("span", { className: "text-sm leading-none", children: "✕" }),
+                      isDeletingGw && i.jsx(De, { size: 12, className: "animate-spin" }),
                       "Excluir"
                     ]
                   })
@@ -3063,7 +3112,42 @@ function rqe() {
 
           activeCheckoutSuccess && i.jsx("div", {
             className: "mx-5 mt-4 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-4 py-2.5 text-xs font-medium text-emerald-300",
-            children: "✓ " + N.name + " agora é o gateway principal ativo para todos os checkouts e cobranças!"
+            children: activeCheckoutSuccess === "secondary"
+              ? "✓ " + N.name + " agora é o 2º Gateway Secundário (Fallback) com sucesso!"
+              : "✓ " + N.name + " agora é o 1º Gateway Primário das vendas com sucesso!"
+          }),
+
+          isGw && i.jsxs("div", {
+            className: "mx-5 mt-4 p-3 rounded-lg border border-white/10 bg-white/[0.02] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs",
+            children: [
+              i.jsxs("div", {
+                className: "flex items-center gap-2 flex-wrap",
+                children: [
+                  i.jsx("span", { className: "font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-semibold", children: "Roteamento Ativo:" }),
+                  i.jsxs("span", {
+                    className: "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-[11px]",
+                    children: [
+                      i.jsx("span", { className: "h-1.5 w-1.5 rounded-full bg-emerald-400" }),
+                      "1º Primário: ",
+                      (C.find(x => x.isActiveCheckout)?.name || "Nenhum")
+                    ]
+                  }),
+                  i.jsx("span", { className: "text-muted-foreground font-bold", children: "➔" }),
+                  i.jsxs("span", {
+                    className: "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[11px]",
+                    children: [
+                      i.jsx("span", { className: "h-1.5 w-1.5 rounded-full bg-amber-400" }),
+                      "2º Fallback: ",
+                      (C.find(x => x.isSecondaryCheckout)?.name || "Nenhum")
+                    ]
+                  })
+                ]
+              }),
+              i.jsx("span", {
+                className: "text-[11px] text-muted-foreground/80",
+                children: "Primeiro tenta o 1º gateway; se não responder, usa o 2º automaticamente."
+              })
+            ]
           }),
 
           i.jsx("div", {
