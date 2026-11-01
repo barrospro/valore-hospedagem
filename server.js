@@ -301,6 +301,7 @@ const publicOrder = (o) => ({
   totalPrice: o.totalPrice ?? o.amount,
   qrCodeText: o.qrCodeText || '',
   qrCodeBase64: o.qrCodeBase64 || '',
+  provider: o.provider || 'nitropay',
   channel: o.channel || (o.gatewayAccount === 'secondary' || o.isCloaked ? 'cloaked' : 'standard'),
   isCloaked: !!(o.isCloaked || o.gatewayAccount === 'secondary'),
 });
