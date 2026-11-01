@@ -709,6 +709,7 @@ async function handleApi(req, res, url) {
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
 
     const today = new Date().toISOString().slice(0, 10);
+    const isTotal = searchParams.get('total') === 'true' || searchParams.get('period') === 'total' || searchParams.get('period') === 'all';
     let startDate = searchParams.get('startDate') || searchParams.get('from');
     let endDate = searchParams.get('endDate') || searchParams.get('to');
     const dateParam = searchParams.get('date');
@@ -745,18 +746,20 @@ async function handleApi(req, res, url) {
       lastDashSyncAt = Date.now();
     }
 
-    const periodStats = store.stats({ startDate, endDate });
-    const allStats = store.stats();
+    const periodStats = isTotal ? store.stats() : store.stats({ startDate, endDate });
+    const allStats = isTotal ? periodStats : store.stats();
 
     const subs = pushService.getSubscriptions().filter((s) => s.endpoint && !s.endpoint.includes('fake_endpoint_123'));
     const execs = (pushAdmin && typeof pushAdmin.getExecutions === 'function')
-      ? pushAdmin.getExecutions({ startDate, endDate, date: startDate })
+      ? (isTotal ? pushAdmin.getExecutions() : pushAdmin.getExecutions({ startDate, endDate, date: startDate }))
       : ((pushService && typeof pushService.getExecutions === 'function') ? pushService.getExecutions() : []);
 
-    const newPushSubs = subs.filter(s => {
-      const d = (s.createdAt || '').slice(0, 10);
-      return d >= startDate && d <= endDate;
-    }).length;
+    const newPushSubs = isTotal
+      ? subs.length
+      : subs.filter(s => {
+          const d = (s.createdAt || '').slice(0, 10);
+          return d >= startDate && d <= endDate;
+        }).length;
 
     // Gerar série temporal com pré-indexação O(1) para alta velocidade (< 2ms)
     const seriesDays = [];
