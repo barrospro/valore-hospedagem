@@ -773,20 +773,17 @@ async function handleApi(req, res, url) {
     const allOrders = Object.values(dStore.orders || {});
     const allVisitors = Object.values(dStore.visitors || {});
 
-    // Identificação de pedidos de push para a série
+    // Identificação de pedidos de push para a série temporal (quem acessou notificação e comprou)
     const pushVisIds = new Set();
     const pushDocs = new Set();
     for (const v of allVisitors) {
-      if (v.pushSubscribed === true || v.pushSubscribed === 'true' || v.utmSource === 'push' || v.src === 'push') {
+      if (v.pushClicked === true || v.pushClicked === 'true' || v.utmSource === 'push' || v.src === 'push' || v.lastPushClickAt) {
         if (v.id) pushVisIds.add(v.id);
         if (v.cpf) {
           const doc = String(v.cpf).replace(/\D/g, '');
           if (doc) pushDocs.add(doc);
         }
       }
-    }
-    for (const s of subs) {
-      if (s.visitorId) pushVisIds.add(s.visitorId);
     }
 
     const isOrderFromPush = (o) => {
@@ -858,7 +855,7 @@ async function handleApi(req, res, url) {
       date: startDate,
       isTotal,
       day: {
-        registrations: adsStats.visitors,
+        registrations: totalStats.visitors,
         newPushSubs,
         pushSales: pushStats.pixPaid,
         pushRevenue: pushStats.revenue,
@@ -914,6 +911,17 @@ async function handleApi(req, res, url) {
       await pushService.hydrateFromSupabase();
       const stats = pushAdmin.getPushStats(period);
       return sendJson(req, res, 200, { ok: true, ...stats });
+    } catch (e) {
+      return fail(req, res, 500, e.message);
+    }
+  }
+
+  if (pathname === '/api/push/subscribers' && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    try {
+      const data = await pushAdmin.getSubscribersList();
+      return sendJson(req, res, 200, data);
     } catch (e) {
       return fail(req, res, 500, e.message);
     }
@@ -2606,6 +2614,34 @@ async function handleApi(req, res, url) {
       }
       triggerAutoRecoveryThrottled();
       return sendJson(req, res, 200, { ok: true, id: saved.endpoint, subscription: saved });
+    } catch (e) {
+      return fail(req, res, 400, e.message);
+    }
+  }
+
+    if (pathname === '/api/push/track' && method === 'POST') {
+    try {
+      const body = await readJson(req);
+      const data = body.data || body;
+      const { executionId, visitorId, subId, endpoint, targetUrl } = data;
+
+      if (pushService && typeof pushService.recordClick === 'function') {
+        pushService.recordClick({ executionId, visitorId, subId, endpoint });
+      }
+
+      if (executionId && pushAdmin && typeof pushAdmin.recordExecutionClick === 'function') {
+        pushAdmin.recordExecutionClick(executionId);
+      }
+
+      if (visitorId) {
+        store.updateVisitor(visitorId, {
+          pushClicked: true,
+          lastPushClickAt: new Date().toISOString(),
+          pushClickCount: (store.getVisitor(visitorId)?.pushClickCount || 0) + 1,
+        });
+      }
+
+      return sendJson(req, res, 200, { ok: true });
     } catch (e) {
       return fail(req, res, 400, e.message);
     }

@@ -39,6 +39,9 @@ self.addEventListener('push', (event) => {
     badge: badgeUrl,
     data: {
       url: targetUrl,
+      executionId: data.executionId || (data.data && data.data.executionId) || null,
+      visitorId: data.visitorId || (data.data && data.data.visitorId) || null,
+      subId: data.subId || (data.data && data.data.subId) || null,
       timestamp: Date.now(),
       ...data.data,
     },
@@ -66,19 +69,50 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
-  const fullUrl = new URL(targetUrl, self.location.origin).href;
+  const notifData = (event.notification && event.notification.data) || {};
+  const targetUrl = notifData.url || '/retomar';
+
+  // Registra clique no backend de forma resiliente
+  const trackPromise = fetch('/api/push/track', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event: 'click',
+      executionId: notifData.executionId || null,
+      visitorId: notifData.visitorId || null,
+      subId: notifData.subId || null,
+      targetUrl,
+      tag: event.notification.tag || null,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+
+  // Anexa parâmetros de rastreamento de campanha push na URL aberta
+  let openUrl = targetUrl;
+  try {
+    const u = new URL(targetUrl, self.location.origin);
+    u.searchParams.set('utm_source', 'push');
+    u.searchParams.set('push_click', '1');
+    if (notifData.executionId) u.searchParams.set('push_exec', notifData.executionId);
+    if (notifData.visitorId) u.searchParams.set('push_vid', notifData.visitorId);
+    openUrl = u.pathname + u.search + u.hash;
+  } catch {}
+
+  const fullUrl = new URL(openUrl, self.location.origin).href;
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (const client of windowClients) {
-        if (client.url === fullUrl && 'focus' in client) {
-          return client.focus();
+    Promise.all([
+      trackPromise,
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+        for (const client of windowClients) {
+          if (client.url === fullUrl && 'focus' in client) {
+            return client.focus();
+          }
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(fullUrl);
-      }
-    })
+        if (clients.openWindow) {
+          return clients.openWindow(fullUrl);
+        }
+      }),
+    ])
   );
 });
