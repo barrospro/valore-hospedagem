@@ -746,8 +746,14 @@ async function handleApi(req, res, url) {
       lastDashSyncAt = Date.now();
     }
 
-    const periodStats = isTotal ? store.stats() : store.stats({ startDate, endDate });
-    const allStats = isTotal ? periodStats : store.stats();
+    // 1. Métricas da Oferta / Anúncios (excluindo push):
+    const adsStats = store.stats({ startDate, endDate, total: isTotal, excludePush: true });
+
+    // 2. Métricas exclusivas do Push (somente quem aceitou notificações / origem push):
+    const pushStats = store.stats({ startDate, endDate, total: isTotal, onlyPush: true });
+
+    // 3. Totais Consolidados:
+    const totalStats = store.stats({ startDate, endDate, total: isTotal });
 
     const subs = pushService.getSubscriptions().filter((s) => s.endpoint && !s.endpoint.includes('fake_endpoint_123'));
     const execs = (pushAdmin && typeof pushAdmin.getExecutions === 'function')
@@ -766,6 +772,32 @@ async function handleApi(req, res, url) {
     const dStore = store.load();
     const allOrders = Object.values(dStore.orders || {});
     const allVisitors = Object.values(dStore.visitors || {});
+
+    // Identificação de pedidos de push para a série
+    const pushVisIds = new Set();
+    const pushDocs = new Set();
+    for (const v of allVisitors) {
+      if (v.pushSubscribed === true || v.pushSubscribed === 'true' || v.utmSource === 'push' || v.src === 'push') {
+        if (v.id) pushVisIds.add(v.id);
+        if (v.cpf) {
+          const doc = String(v.cpf).replace(/\D/g, '');
+          if (doc) pushDocs.add(doc);
+        }
+      }
+    }
+    for (const s of subs) {
+      if (s.visitorId) pushVisIds.add(s.visitorId);
+    }
+
+    const isOrderFromPush = (o) => {
+      if (o.fromPush || o.isPush || o.utmSource === 'push') return true;
+      if (o.visitorId && pushVisIds.has(o.visitorId)) return true;
+      if (o.customer?.document) {
+        const doc = String(o.customer.document).replace(/\D/g, '');
+        if (doc && pushDocs.has(doc)) return true;
+      }
+      return false;
+    };
 
     const ordersByDate = {};
     for (const o of allOrders) {
@@ -788,18 +820,24 @@ async function handleApi(req, res, url) {
 
     let seriesStart = startDate;
     let seriesEnd = endDate;
-    if (startDate === endDate) {
-      const endD = new Date(endDate + 'T12:00:00Z');
+    if (isTotal || startDate === endDate) {
+      const endD = new Date((isTotal ? today : endDate) + 'T12:00:00Z');
       const startD = new Date(endD.getTime() - 29 * 86400000);
       seriesStart = startD.toISOString().slice(0, 10);
+      seriesEnd = isTotal ? today : endDate;
     }
 
     let curD = new Date(seriesStart + 'T12:00:00Z');
     const stopD = new Date(seriesEnd + 'T12:00:00Z');
     while (curD <= stopD) {
       const curDateStr = curD.toISOString().slice(0, 10);
-      const dayPaid = (ordersByDate[curDateStr] || []).filter(o => o.status === 'COMPLETED');
-      const dayRev = Number(dayPaid.reduce((acc, o) => acc + (Number(o.amount) || 0), 0).toFixed(2));
+      const dayOrders = ordersByDate[curDateStr] || [];
+      const dayPaid = dayOrders.filter(o => o.status === 'COMPLETED');
+      const dayPushPaid = dayPaid.filter(isOrderFromPush);
+      const dayAdsPaid = dayPaid.filter(o => !isOrderFromPush(o));
+
+      const dayPushRev = Number(dayPushPaid.reduce((acc, o) => acc + (Number(o.amount) || 0), 0).toFixed(2));
+      const dayAdsRev = Number(dayAdsPaid.reduce((acc, o) => acc + (Number(o.amount) || 0), 0).toFixed(2));
       const dayVis = visitorsByDate[curDateStr] || [];
       const daySubs = subsByDate[curDateStr] || [];
 
@@ -807,7 +845,9 @@ async function handleApi(req, res, url) {
         date: curDateStr,
         registrations: dayVis.length,
         pushSubs: daySubs.length,
-        pushRevenue: dayRev,
+        pushRevenue: dayPushRev,
+        adsRevenue: dayAdsRev,
+        faturamento: dayPushRev,
       });
       curD = new Date(curD.getTime() + 86400000);
     }
@@ -816,49 +856,57 @@ async function handleApi(req, res, url) {
       startDate,
       endDate,
       date: startDate,
+      isTotal,
       day: {
-        registrations: periodStats.visitors,
+        registrations: adsStats.visitors,
         newPushSubs,
-        pushSales: periodStats.pixPaid,
-        pushRevenue: periodStats.revenue,
+        pushSales: pushStats.pixPaid,
+        pushRevenue: pushStats.revenue,
         notificationsSent: execs.reduce((acc, e) => acc + (e.sentCount || e.sent || e.counts?.sent || 0), 0),
         executions: execs.length,
         activePushSubs: subs.length,
 
-        // Métricas da oferta calculadas para o período selecionado
-        offerTotalRevenue: periodStats.revenue,
-        offerCompletionRate: periodStats.completionRate,
-        offerPixGenerated: periodStats.pixGenerated,
-        offerPixPaid: periodStats.pixPaid,
-        offerCheckoutAbandons: periodStats.checkoutAbandons,
-        offerFunnelAbandons: periodStats.funnelAbandons,
-        offerMidFunnelAbandonRate: periodStats.midFunnelAbandonRate,
-        offerCheckoutAbandonRate: periodStats.checkoutAbandonRate,
-        offerAbandonRanking: periodStats.abandonRanking || [],
+        // Métricas gerais da oferta (EXCLUINDO push)
+        offerTotalRevenue: adsStats.revenue,
+        offerCompletionRate: adsStats.completionRate,
+        offerPixGenerated: adsStats.pixGenerated,
+        offerPixPaid: adsStats.pixPaid,
+        offerCheckoutAbandons: adsStats.checkoutAbandons,
+        offerFunnelAbandons: adsStats.funnelAbandons,
+        offerMidFunnelAbandonRate: adsStats.midFunnelAbandonRate,
+        offerCheckoutAbandonRate: adsStats.checkoutAbandonRate,
+        offerAbandonRanking: adsStats.abandonRanking || [],
       },
       offer: {
-        totalRevenue: periodStats.revenue,
-        completionRate: periodStats.completionRate,
-        pixGenerated: periodStats.pixGenerated,
-        pixPaid: periodStats.pixPaid,
-        checkoutAbandons: periodStats.checkoutAbandons,
-        funnelAbandons: periodStats.funnelAbandons,
-        midFunnelAbandonRate: periodStats.midFunnelAbandonRate,
-        checkoutAbandonRate: periodStats.checkoutAbandonRate,
-        abandonRanking: periodStats.abandonRanking || [],
+        totalRevenue: adsStats.revenue,
+        completionRate: adsStats.completionRate,
+        pixGenerated: adsStats.pixGenerated,
+        pixPaid: adsStats.pixPaid,
+        checkoutAbandons: adsStats.checkoutAbandons,
+        funnelAbandons: adsStats.funnelAbandons,
+        midFunnelAbandonRate: adsStats.midFunnelAbandonRate,
+        checkoutAbandonRate: adsStats.checkoutAbandonRate,
+        abandonRanking: adsStats.abandonRanking || [],
+      },
+      push: {
+        revenue: pushStats.revenue,
+        sales: pushStats.pixPaid,
+        pixGenerated: pushStats.pixGenerated,
+        visitors: pushStats.visitors,
       },
       allTime: {
-        totalRevenue: allStats.totalRevenue,
-        pixGenerated: allStats.pixGenerated,
-        pixPaid: allStats.pixPaid,
-        visitors: allStats.visitors,
+        totalRevenue: totalStats.revenue,
+        pixGenerated: totalStats.pixGenerated,
+        pixPaid: totalStats.pixPaid,
+        visitors: totalStats.visitors,
       },
-      abandonRanking: periodStats.abandonRanking || [],
+      abandonRanking: adsStats.abandonRanking || [],
       series: seriesDays,
     });
   }
 
-  if (pathname === '/api/push/stats' && method === 'GET') {
+
+    if (pathname === '/api/push/stats' && method === 'GET') {
     const token = admin.extractToken(req);
     if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
     const period = searchParams.get('period') || 'day';
