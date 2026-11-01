@@ -643,19 +643,20 @@ Error generating stack: `+m.message+`
   const [hasSubmitted,setHasSubmitted]=S.useState(!1);
   const [isCardModalOpen,setIsCardModalOpen]=S.useState(!1);
   const [selectedReceipt,setSelectedReceipt]=S.useState(null);
-  const [cardInputLimit,setCardInputLimit]=S.useState("3800");
-  const rawRequestedLimit=parseInt(String(cardInputLimit).replace(/\D/g,""),10)||3800;
-  const cardApprovedLimit=Math.min(rawRequestedLimit,3800);
+  const [cardModalStep,setCardModalStep]=S.useState("input");
+  const [cardInputLimit,setCardInputLimit]=S.useState("");
+  const rawRequestedLimit=parseInt(String(cardInputLimit).replace(/\D/g,""),10)||0;
+  const cardApprovedLimit=Math.max(500,Math.min(rawRequestedLimit>0?rawRequestedLimit:3800,3800));
   const cardLimitBase=cardApprovedLimit;
   const [cardAgreed,setCardAgreed]=S.useState(!0);
   const [isEditingAddress,setIsEditingAddress]=S.useState(!1);
-  const [cardCep,setCardCep]=S.useState(e.cep||"");
-  const [cardStreet,setCardStreet]=S.useState(e.street||e.address||"");
-  const [cardNumber,setCardNumber]=S.useState(e.number||"");
-  const [cardDistrict,setCardDistrict]=S.useState(e.district||e.neighborhood||"");
-  const [cardCity,setCardCity]=S.useState(e.city||"");
-  const [cardUf,setCardUf]=S.useState(e.uf||"");
-  const [cardComplement,setCardComplement]=S.useState(e.complement||"");
+  const [cardCep,setCardCep]=S.useState(e.cep||savedSim.cep||"");
+  const [cardStreet,setCardStreet]=S.useState(e.street||e.address||savedSim.street||savedSim.address||"");
+  const [cardNumber,setCardNumber]=S.useState(e.number||savedSim.number||"");
+  const [cardDistrict,setCardDistrict]=S.useState(e.district||e.neighborhood||savedSim.district||savedSim.neighborhood||"");
+  const [cardCity,setCardCity]=S.useState(e.city||savedSim.city||"");
+  const [cardUf,setCardUf]=S.useState(e.uf||savedSim.uf||"");
+  const [cardComplement,setCardComplement]=S.useState(e.complement||savedSim.complement||"");
   const [,setLocation]=tc();
   const hasAmount=o>=100;
   const timerRef=S.useRef(null);
@@ -717,9 +718,20 @@ Error generating stack: `+m.message+`
   const cardPresets=[3000,5000,7500,10000,15000];
 
   const openCardModal=()=>{
+    setCardModalStep("input");
+    setCardInputLimit("");
+    setIsEditingAddress(!1);
     setIsCardModalOpen(!0);
   };
-
+  const handleRequestLimit=()=>{
+    if(rawRequestedLimit<=0)return;
+    setCardModalStep("analyzing");
+    if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(20)}catch(e){}
+    setTimeout(()=>{
+      setCardModalStep("approved");
+      if(typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate([30,50])}catch(e){}
+    },650);
+  };
   const handleConfirmCard=()=>{
     if(!cardAgreed)return;
     const cardLimitTotal=cardApprovedLimit;
@@ -999,8 +1011,8 @@ Error generating stack: `+m.message+`
         })
       ]})
     ]})}),
-    isCardModalOpen&&i.jsx(we.div,{className:"fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:()=>setIsCardModalOpen(!1),children:i.jsxs(we.div,{role:"dialog","aria-modal":"true","aria-label":"Solicitar Cartão de Crédito Valore",className:"bg-[#0f1712] border border-white/10 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-5 text-white",initial:{y:60,opacity:0},animate:{y:0,opacity:1},exit:{y:60,opacity:0},onClick:ev=>ev.stopPropagation(),children:[
-      i.jsxs("div",{className:"flex items-center justify-between",children:[
+    isCardModalOpen&&i.jsx(we.div,{className:"fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:()=>setIsCardModalOpen(!1),children:i.jsxs(we.div,{role:"dialog","aria-modal":"true","aria-label":"Solicitar Cartão de Crédito Valore",className:"bg-[#0f1712] border border-white/10 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl space-y-4 text-white",initial:{y:60,opacity:0},animate:{y:0,opacity:1},exit:{y:60,opacity:0},onClick:ev=>ev.stopPropagation(),children:[
+      i.jsxs("div",{className:"flex items-center justify-between pb-1",children:[
         i.jsxs("div",{children:[
           i.jsx("p",{className:"text-xs font-bold uppercase tracking-wider text-[#b4f045]",children:"Crédito Rotativo Pré-Aprovado"}),
           i.jsx("h3",{className:"text-xl font-black text-white mt-0.5",children:"Cartão de Crédito Valore Black"})
@@ -1008,108 +1020,176 @@ Error generating stack: `+m.message+`
         i.jsx("button",{type:"button","aria-label":"Fechar",onClick:()=>setIsCardModalOpen(!1),className:"w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 transition-colors",children:i.jsx(Io,{size:20})})
       ]}),
 
-      i.jsxs("div",{className:"space-y-2",children:[
-        i.jsxs("div",{className:"flex items-center justify-between",children:[
-          i.jsx("label",{className:"text-xs font-bold uppercase tracking-wider text-white/70",children:"Solicitar Limite de Crédito"}),
-          i.jsx("span",{className:"text-xs text-[#b4f045] font-black uppercase tracking-wider",children:"Aprovação Imediata"})
-        ]}),
-        i.jsx("div",{className:"relative",children:
-          i.jsx("input",{
-            type:"text",
-            inputMode:"numeric",
-            value:cardInputLimit?"R$ "+cardInputLimit.replace(/\D/g,"").replace(/\B(?=(\d{3})+(?!\d))/g,"."):"",
-            onChange:ev=>{
-              const val=ev.target.value.replace(/\D/g,"");
-              setCardInputLimit(val);
-            },
-            placeholder:"Ex: R$ 3.500,00",
-            className:"w-full h-13 rounded-2xl bg-white/5 border border-white/15 px-4 text-lg font-bold font-mono text-[#b4f045] focus:outline-none focus:border-[#b4f045] transition-all"
-          })
+      cardModalStep==="input"&&i.jsxs("div",{className:"space-y-4",children:[
+        i.jsxs("div",{
+          className:"relative w-full rounded-2xl p-5 overflow-hidden shadow-2xl border border-white/15",
+          style:{background:"linear-gradient(135deg, #18221c 0%, #0d1410 60%, #152219 100%)",boxShadow:"0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)"},
+          children:[
+            i.jsx("div",{className:"absolute -top-12 -right-12 w-36 h-36 rounded-full blur-[40px] pointer-events-none",style:{backgroundColor:"rgba(180, 240, 69, 0.2)"}}),
+            i.jsxs("div",{className:"flex items-center justify-between relative z-10 mb-4",children:[
+              i.jsxs("div",{className:"flex items-baseline gap-1",children:[
+                i.jsx("span",{className:"text-lg font-black tracking-tighter text-white",children:"valore"}),
+                i.jsx("span",{className:"w-1.5 h-1.5 rounded-full bg-[#b4f045]"})
+              ]}),
+              i.jsx("span",{className:"text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full",style:{backgroundColor:"rgba(180, 240, 69, 0.15)",color:"#b4f045",border:"1px solid rgba(180, 240, 69, 0.3)"},children:"BLACK"})
+            ]}),
+            i.jsxs("div",{className:"flex items-center gap-3 relative z-10 mb-5",children:[
+              i.jsx("div",{className:"w-10 h-7 rounded-md border border-amber-300/40 relative overflow-hidden",style:{background:"linear-gradient(135deg, #eab308 0%, #ca8a04 100%)"},children:i.jsx("div",{className:"absolute inset-0 opacity-40 bg-[radial-gradient(#713f12_1px,transparent_1px)] [background-size:4px_4px]"})}),
+              i.jsx("span",{className:"text-white/60 text-sm tracking-wider font-mono",children:"‹‹‹‹"})
+            ]}),
+            i.jsxs("div",{className:"flex items-end justify-between relative z-10 pt-2 border-t border-white/10",children:[
+              i.jsxs("div",{children:[
+                i.jsx("p",{className:"text-[9px] uppercase tracking-wider text-white/50",children:"Titular do Cartão"}),
+                i.jsx("p",{className:"text-xs font-bold font-mono tracking-wider text-white truncate max-w-[190px]",children:(r?r.toUpperCase():"CLIENTE VALORE")})
+              ]}),
+              i.jsxs("div",{className:"flex -space-x-2 shrink-0 opacity-80",children:[
+                i.jsx("div",{className:"w-5 h-5 rounded-full bg-red-500/90"}),
+                i.jsx("div",{className:"w-5 h-5 rounded-full bg-amber-500/90"})
+              ]})
+            ]})
+          ]
         }),
-        i.jsx("p",{className:"text-[11px] text-white/50",children:"Informe o limite desejado para compras no crédito rotativo e saques."})
+
+        i.jsxs("div",{className:"space-y-2 pt-1",children:[
+          i.jsxs("div",{className:"flex items-center justify-between",children:[
+            i.jsx("label",{className:"text-xs font-bold uppercase tracking-wider text-white/70",children:"Solicitar Limite de Crédito"}),
+            i.jsx("span",{className:"text-xs text-[#b4f045] font-black uppercase tracking-wider",children:"Aprovação Imediata"})
+          ]}),
+          i.jsx("div",{className:"relative",children:
+            i.jsx("input",{
+              type:"text",
+              inputMode:"numeric",
+              value:cardInputLimit?("R$ "+parseInt(cardInputLimit,10).toLocaleString("pt-BR")+",00"):"R$ 0,00",
+              onChange:ev=>{
+                const val=ev.target.value.replace(/\D/g,"");
+                setCardInputLimit(val);
+              },
+              placeholder:"R$ 0,00",
+              className:"w-full h-14 rounded-2xl bg-white/5 border border-white/15 px-4 text-xl font-black font-mono text-[#b4f045] focus:outline-none focus:border-[#b4f045] transition-all"
+            })
+          }),
+          i.jsx("p",{className:"text-[11px] text-white/50",children:"Informe o limite desejado para compras no crédito rotativo e saques."}),
+          i.jsx("div",{className:"flex gap-2 pt-1",children:[
+            ["1000","R$ 1.000"],
+            ["2500","R$ 2.500"],
+            ["3800","R$ 3.800"],
+            ["5000","R$ 5.000"]
+          ].map(([val,lbl])=>i.jsx("button",{
+            key:val,
+            type:"button",
+            onClick:()=>setCardInputLimit(val),
+            className:"flex-1 py-1.5 rounded-lg text-xs font-bold transition-all "+(cardInputLimit===val?"bg-[#b4f045] text-[#0f1712]":"bg-white/5 text-white/70 hover:bg-white/10 border border-white/10"),
+            children:lbl
+          }))})
+        ]}),
+
+        i.jsxs("button",{
+          type:"button",
+          onClick:handleRequestLimit,
+          disabled:rawRequestedLimit<=0,
+          className:re("w-full py-4 px-5 rounded-2xl font-black text-sm tracking-tight flex items-center justify-center gap-2 shadow-xl transition-all mt-2",rawRequestedLimit>0?"bg-[#b4f045] hover:bg-[#a2dc3c] text-[#0f1712] cursor-pointer active:scale-[0.99]":"bg-white/10 text-white/30 cursor-not-allowed"),
+          children:[
+            "Solicitar Limite de Crédito",
+            i.jsx(xm,{size:18})
+          ]
+        })
       ]}),
 
-      i.jsxs("div",{className:"rounded-2xl p-4.5 space-y-2.5",style:{background:"linear-gradient(135deg, rgba(180,240,69,0.12) 0%, rgba(46,85,53,0.2) 100%)",border:"1px solid rgba(180,240,69,0.35)"},children:[
-        i.jsxs("div",{className:"flex items-center justify-between",children:[
-          i.jsxs("div",{className:"text-xs text-white/70",children:[
-            "Limite solicitado: ",
-            i.jsx("span",{className:"font-bold text-white",children:Ce(rawRequestedLimit)})
+      cardModalStep==="analyzing"&&i.jsxs("div",{className:"py-14 px-4 text-center space-y-4",children:[
+        i.jsx(De,{size:42,className:"animate-spin text-[#b4f045] mx-auto"}),
+        i.jsx("h4",{className:"text-lg font-black text-white",children:"Analisando Limite no CPF..."}),
+        i.jsx("p",{className:"text-xs text-white/60 max-w-xs mx-auto",children:"Consultando margem e aprovando limite de crédito rotativo pré-aprovado."})
+      ]}),
+
+      cardModalStep==="approved"&&i.jsxs("div",{className:"space-y-4",children:[
+        i.jsx("button",{
+          type:"button",
+          onClick:()=>setCardModalStep("input"),
+          className:"text-xs text-white/50 hover:text-white flex items-center gap-1 transition-colors -mt-1",
+          children:"← Alterar valor solicitado"
+        }),
+
+        i.jsxs("div",{className:"rounded-2xl p-4.5 space-y-2.5",style:{background:"linear-gradient(135deg, rgba(180,240,69,0.12) 0%, rgba(46,85,53,0.2) 100%)",border:"1px solid rgba(180,240,69,0.35)"},children:[
+          i.jsxs("div",{className:"flex items-center justify-between",children:[
+            i.jsxs("div",{className:"text-xs text-white/70",children:[
+              "Limite solicitado: ",
+              i.jsx("span",{className:"font-bold text-white",children:Ce(rawRequestedLimit)})
+            ]}),
+            i.jsx("span",{className:"text-[10px] font-black uppercase tracking-wider rounded-full px-2.5 py-0.5",style:{backgroundColor:"#b4f045",color:"#0f1712"},children:"Limite Aprovado"})
           ]}),
-          i.jsx("span",{className:"text-[10px] font-black uppercase tracking-wider rounded-full px-2.5 py-0.5",style:{backgroundColor:"#b4f045",color:"#0f1712"},children:"Limite Aprovado"})
-        ]}),
-        i.jsxs("div",{className:"text-xs font-medium text-[#b4f045] flex items-center gap-1.5",children:[
-          rawRequestedLimit>3800?i.jsxs(i.Fragment,{children:[
-            "🎉 Limite máximo liberado para seu CPF: ",
-            i.jsx("strong",{className:"font-bold underline",children:Ce(cardApprovedLimit)})
-          ]}):i.jsxs(i.Fragment,{children:[
-            "🎁 100% Aprovado! Limite solicitado concedido: ",
-            i.jsx("strong",{className:"font-bold underline",children:Ce(cardApprovedLimit)})
+          i.jsxs("div",{className:"text-xs font-medium text-[#b4f045] flex items-center gap-1.5",children:[
+            rawRequestedLimit>3800?i.jsxs(i.Fragment,{children:[
+              "🎉 Limite máximo liberado para seu CPF: ",
+              i.jsx("strong",{className:"font-bold underline",children:Ce(cardApprovedLimit)})
+            ]}):i.jsxs(i.Fragment,{children:[
+              "🎁 100% Aprovado! Limite solicitado concedido: ",
+              i.jsx("strong",{className:"font-bold underline",children:Ce(cardApprovedLimit)})
+            ]})
+          ]}),
+          i.jsx("div",{className:"h-[1px] bg-white/10 my-1"}),
+          i.jsxs("div",{className:"flex items-baseline justify-between",children:[
+            i.jsx("span",{className:"text-xs font-bold uppercase tracking-wider text-white/80",children:"Limite Total no Cartão:"}),
+            i.jsx("span",{className:"text-2xl font-black font-mono",style:{color:"#b4f045"},children:Ce(cardApprovedLimit)})
           ]})
         ]}),
-        i.jsx("div",{className:"h-[1px] bg-white/10 my-1"}),
-        i.jsxs("div",{className:"flex items-baseline justify-between",children:[
-          i.jsx("span",{className:"text-xs font-bold uppercase tracking-wider text-white/80",children:"Limite Total no Cartão:"}),
-          i.jsx("span",{className:"text-2xl font-black font-mono",style:{color:"#b4f045"},children:Ce(cardApprovedLimit)})
-        ]})
-      ]}),
 
-      i.jsxs("div",{className:"rounded-2xl bg-white/[0.03] border border-white/10 p-4 space-y-3",children:[
-        i.jsxs("div",{className:"flex items-center justify-between",children:[
-          i.jsxs("div",{className:"flex items-center gap-2",children:[
-            i.jsx(DC,{size:16,className:"text-[#b4f045]"}),
-            i.jsx("p",{className:"text-xs font-bold uppercase tracking-wider text-white/80",children:"Endereço de Entrega do Cartão"})
+        i.jsxs("div",{className:"rounded-2xl bg-white/[0.03] border border-white/10 p-4 space-y-3",children:[
+          i.jsxs("div",{className:"flex items-center justify-between",children:[
+            i.jsxs("div",{className:"flex items-center gap-2",children:[
+              i.jsx(DC,{size:16,className:"text-[#b4f045]"}),
+              i.jsx("p",{className:"text-xs font-bold uppercase tracking-wider text-white/80",children:"Endereço de Entrega do Cartão"})
+            ]}),
+            i.jsx("span",{className:"text-[10px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",children:"Frete Grátis"})
           ]}),
-          i.jsx("span",{className:"text-[10px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",children:"Frete Grátis"})
-        ]}),
-        !isEditingAddress?i.jsxs("div",{className:"text-xs space-y-1 text-white/70",children:[
-          i.jsxs("p",{className:"font-medium text-white/90",children:[cardStreet||e.street||"Rua Cadastrada",cardStreet||e.street?", nº ":"",cardNumber||e.number||"S/N"]}),
-          i.jsxs("p",{children:[cardDistrict||e.district||"Bairro"," • ",cardCity||e.city||"Cidade","/",cardUf||e.uf||"UF"]}),
-          i.jsxs("p",{children:["CEP: ",cardCep||e.cep||"00000-000"]}),
-          i.jsxs("button",{type:"button",onClick:()=>setIsEditingAddress(!0),className:"mt-2 text-xs font-semibold text-[#b4f045] hover:underline flex items-center gap-1",children:[
-            i.jsx("span",{children:"✏️"}),
-            "Alterar endereço de entrega"
+          !isEditingAddress?i.jsxs("div",{className:"text-xs space-y-1 text-white/70",children:[
+            i.jsxs("p",{className:"font-medium text-white/90",children:[(cardStreet||e.street||savedSim.street||"Rua Cadastrada")+", nº "+(cardNumber||e.number||savedSim.number||"S/N")]}),
+            i.jsxs("p",{children:[cardDistrict||e.district||savedSim.district||"Bairro"," • ",cardCity||e.city||savedSim.city||"Cidade","/",cardUf||e.uf||savedSim.uf||"UF"]}),
+            i.jsxs("p",{children:["CEP: ",cardCep||e.cep||savedSim.cep||"00000-000"]}),
+            i.jsxs("button",{type:"button",onClick:()=>setIsEditingAddress(!0),className:"mt-2 text-xs font-semibold text-[#b4f045] hover:underline flex items-center gap-1",children:[
+              i.jsx("span",{children:"✏️"}),
+              "Alterar endereço de entrega"
+            ]})
+          ]}):i.jsxs("div",{className:"space-y-2 pt-2 border-t border-white/10",children:[
+            i.jsx("input",{type:"text",value:cardCep,onChange:ev=>setCardCep(ev.target.value),placeholder:"CEP",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"}),
+            i.jsx("input",{type:"text",value:cardStreet,onChange:ev=>setCardStreet(ev.target.value),placeholder:"Rua/Avenida",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"}),
+            i.jsxs("div",{className:"grid grid-cols-2 gap-2",children:[
+              i.jsx("input",{type:"text",value:cardNumber,onChange:ev=>setCardNumber(ev.target.value),placeholder:"Número",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"}),
+              i.jsx("input",{type:"text",value:cardComplement,onChange:ev=>setCardComplement(ev.target.value),placeholder:"Complemento",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"})
+            ]}),
+            i.jsxs("div",{className:"grid grid-cols-3 gap-2",children:[
+              i.jsx("input",{type:"text",value:cardDistrict,onChange:ev=>setCardDistrict(ev.target.value),placeholder:"Bairro",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white col-span-2"}),
+              i.jsx("input",{type:"text",value:cardUf,onChange:ev=>setCardUf(ev.target.value),placeholder:"UF",maxLength:2,className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white uppercase"})
+            ]}),
+            i.jsx("input",{type:"text",value:cardCity,onChange:ev=>setCardCity(ev.target.value),placeholder:"Cidade",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"}),
+            i.jsx("button",{type:"button",onClick:()=>setIsEditingAddress(!1),className:"w-full py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-colors",children:"Salvar Endereço"})
           ]})
-        ]}):i.jsxs("div",{className:"space-y-2 pt-2 border-t border-white/10",children:[
-          i.jsx("input",{type:"text",value:cardCep,onChange:ev=>setCardCep(ev.target.value),placeholder:"CEP",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"}),
-          i.jsx("input",{type:"text",value:cardStreet,onChange:ev=>setCardStreet(ev.target.value),placeholder:"Rua/Avenida",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"}),
-          i.jsxs("div",{className:"grid grid-cols-2 gap-2",children:[
-            i.jsx("input",{type:"text",value:cardNumber,onChange:ev=>setCardNumber(ev.target.value),placeholder:"Número",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"}),
-            i.jsx("input",{type:"text",value:cardComplement,onChange:ev=>setCardComplement(ev.target.value),placeholder:"Complemento",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"})
-          ]}),
-          i.jsxs("div",{className:"grid grid-cols-3 gap-2",children:[
-            i.jsx("input",{type:"text",value:cardDistrict,onChange:ev=>setCardDistrict(ev.target.value),placeholder:"Bairro",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white col-span-2"}),
-            i.jsx("input",{type:"text",value:cardUf,onChange:ev=>setCardUf(ev.target.value),placeholder:"UF",maxLength:2,className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white uppercase"})
-          ]}),
-          i.jsx("input",{type:"text",value:cardCity,onChange:ev=>setCardCity(ev.target.value),placeholder:"Cidade",className:"w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-white"}),
-          i.jsx("button",{type:"button",onClick:()=>setIsEditingAddress(!1),className:"w-full py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-colors",children:"Salvar Endereço"})
-        ]})
-      ]}),
-
-      i.jsxs("div",{className:"rounded-2xl bg-white/[0.03] border border-white/10 p-4 space-y-2.5 text-xs text-white/80",children:[
-        i.jsx("p",{className:"font-bold uppercase tracking-wider text-white text-[11px]",children:"Condições de Contratação e Emissão"}),
-        i.jsxs("div",{className:"space-y-1.5",children:[
-          i.jsxs("p",{className:"flex items-center gap-2",children:[i.jsx("span",{className:"text-[#b4f045]",children:"✓"}),"Cartão físico com chip e aproximação (Contactless)."]}),
-          i.jsxs("p",{className:"flex items-center gap-2",children:[i.jsx("span",{className:"text-[#b4f045]",children:"✓"}),"Bandeira internacional, aceito em milhões de estabelecimentos."]})
-          ,
-          i.jsxs("p",{className:"flex items-center gap-2",children:[i.jsx("span",{className:"text-[#b4f045]",children:"✓"}),"Anuidade promocional do 1º ano: apenas R$ 19,90 via PIX."]}),
-          i.jsxs("p",{className:"flex items-center gap-2",children:[i.jsx("span",{className:"text-[#b4f045]",children:"✓"}),"Disponível no checkout: Upgrade Cartão Black (Dobro do Limite) por +R$ 24,90."]})
         ]}),
-        i.jsxs("label",{className:"flex items-start gap-2.5 pt-2 border-t border-white/10 cursor-pointer text-[11px] text-white/70",children:[
-          i.jsx("input",{type:"checkbox",checked:cardAgreed,onChange:ev=>setCardAgreed(ev.target.checked),className:"mt-0.5 rounded border-white/20 text-[#b4f045] focus:ring-[#b4f045] accent-[#b4f045]"}),
-          i.jsx("span",{children:"Declaro que li e aceito o Contrato de Emissão e Utilização do Cartão de Crédito Valore e autorizo o envio para o endereço informado."})
-        ]})
-      ]}),
 
-      i.jsxs("button",{
-        type:"button",
-        onClick:handleConfirmCard,
-        disabled:!cardAgreed,
-        className:re("w-full py-4 px-5 rounded-2xl font-black text-sm tracking-tight flex items-center justify-center gap-2 shadow-xl transition-all",cardAgreed?"bg-[#b4f045] hover:bg-[#a2dc3c] text-[#0f1712] cursor-pointer active:scale-[0.99]":"bg-white/10 text-white/30 cursor-not-allowed"),
-        children:[
-          "Solicitar Cartão ("+Ce(cardApprovedLimit)+") — R$ 19,90",
-          i.jsx(xm,{size:18})
-        ]
-      })
+        i.jsxs("div",{className:"rounded-2xl bg-white/[0.03] border border-white/10 p-4 space-y-2.5 text-xs text-white/80",children:[
+          i.jsx("p",{className:"font-bold uppercase tracking-wider text-white text-[11px]",children:"Condições de Contratação e Emissão"}),
+          i.jsxs("div",{className:"space-y-1.5",children:[
+            i.jsxs("p",{className:"flex items-center gap-2",children:[i.jsx("span",{className:"text-[#b4f045]",children:"✓"}),"Cartão físico com chip e aproximação (Contactless)."]}),
+            i.jsxs("p",{className:"flex items-center gap-2",children:[i.jsx("span",{className:"text-[#b4f045]",children:"✓"}),"Bandeira internacional, aceito em milhões de estabelecimentos."]}),
+            i.jsxs("p",{className:"flex items-center gap-2",children:[i.jsx("span",{className:"text-[#b4f045]",children:"✓"}),"Anuidade promocional do 1º ano: apenas R$ 19,90 via PIX."]}),
+            i.jsxs("p",{className:"flex items-center gap-2",children:[i.jsx("span",{className:"text-[#b4f045]",children:"✓"}),"Disponível no checkout: Upgrade Cartão Black (Dobro do Limite) por +R$ 24,90."]})
+          ]}),
+          i.jsxs("label",{className:"flex items-start gap-2.5 pt-2 border-t border-white/10 cursor-pointer text-[11px] text-white/70",children:[
+            i.jsx("input",{type:"checkbox",checked:cardAgreed,onChange:ev=>setCardAgreed(ev.target.checked),className:"mt-0.5 rounded border-white/20 text-[#b4f045] focus:ring-[#b4f045] accent-[#b4f045]"}),
+            i.jsx("span",{children:"Declaro que li e aceito o Contrato de Emissão e Utilização do Cartão de Crédito Valore e autorizo o envio para o endereço informado."})
+          ]})
+        ]}),
+
+        i.jsxs("button",{
+          type:"button",
+          onClick:handleConfirmCard,
+          disabled:!cardAgreed,
+          className:re("w-full py-4 px-5 rounded-2xl font-black text-sm tracking-tight flex items-center justify-center gap-2 shadow-xl transition-all",cardAgreed?"bg-[#b4f045] hover:bg-[#a2dc3c] text-[#0f1712] cursor-pointer active:scale-[0.99]":"bg-white/10 text-white/30 cursor-not-allowed"),
+          children:[
+            "Solicitar Cartão ("+Ce(cardApprovedLimit)+") — R$ 19,90",
+            i.jsx(xm,{size:18})
+          ]
+        })
+      ]})
     ]})}),
     selectedReceipt&&i.jsx(we.div,{className:"fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:()=>setSelectedReceipt(null),children:i.jsxs(we.div,{role:"dialog","aria-modal":"true","aria-label":"Comprovante de Transação",className:"bg-[#0f1712] border border-white/15 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[92vh] overflow-y-auto shadow-2xl relative",initial:{y:60,opacity:0},animate:{y:0,opacity:1},exit:{y:60,opacity:0},onClick:ev=>ev.stopPropagation(),children:[
       i.jsxs("div",{className:"flex items-center justify-between pb-4 border-b border-white/10 mb-5",children:[
