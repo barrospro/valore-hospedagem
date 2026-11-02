@@ -1904,6 +1904,179 @@ async function handleApi(req, res, url) {
     }
   }
 
+
+function generateLeadsCsv(rows = []) {
+  function escapeCsv(val) {
+    if (val === null || val === undefined) return '';
+    let str = String(val);
+    if (/[;\n\r",]/.test(str)) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  }
+
+  function formatDateTime(val) {
+    if (!val) return '';
+    try {
+      const d = new Date(typeof val === 'number' && val < 1e12 ? val * 1000 : val);
+      if (isNaN(d.getTime())) return String(val);
+      return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    } catch {
+      return String(val);
+    }
+  }
+
+  function formatCpf(val) {
+    if (!val) return '';
+    const digits = String(val).replace(/\D/g, '');
+    if (digits.length === 11) {
+      return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+    }
+    return String(val);
+  }
+
+  function formatStatus(st) {
+    const map = {
+      pagou_pix: 'Pagou Pix (Aprovado)',
+      pago: 'Pagou Pix (Aprovado)',
+      comprador: 'Pagou Pix (Aprovado)',
+      gerou_pix: 'Gerou Pix (Pendente)',
+      abandono_pix: 'Abandono de Pix',
+      abandono_funil: 'Abandono de Funil',
+      abandonado: 'Abandono de Funil',
+      andamento: 'Em Andamento',
+      em_andamento: 'Em Andamento'
+    };
+    return map[st] || st || 'Em Andamento';
+  }
+
+  const sep = ';';
+  const headers = [
+    'ID',
+    'Data de Cadastro',
+    'Último Acesso',
+    'Nome Completo',
+    'CPF',
+    'Telefone / WhatsApp',
+    'E-mail',
+    'Status',
+    'Etapa do Funil',
+    'Valor Solicitado (R$)',
+    'Parcelas',
+    'Banco de Destino',
+    'Chave PIX',
+    'Tipo de Chave PIX',
+    'ID do Pedido PIX',
+    'Pagou PIX',
+    'Renda Declarada',
+    'Finalidade',
+    'Nome da Mãe',
+    'Data de Nascimento',
+    'Gênero',
+    'Cidade',
+    'Estado',
+    'Dispositivo',
+    'Sistema Operacional',
+    'Navegador',
+    'Endereço IP',
+    'UTM Source',
+    'UTM Medium',
+    'UTM Campaign'
+  ];
+
+  const lines = [headers.map(escapeCsv).join(sep)];
+
+  for (const r of rows) {
+    const line = [
+      r.id || '',
+      formatDateTime(r.createdAt),
+      formatDateTime(r.lastSeenAt || r.lastSeen),
+      r.name || '',
+      formatCpf(r.cpf),
+      r.phone || '',
+      r.email || '',
+      formatStatus(r.status),
+      r.stage || '',
+      r.amount != null && r.amount !== '' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
+      r.installments || '',
+      r.bank || '',
+      r.pixKey || '',
+      r.pixKeyType || '',
+      r.orderId || '',
+      r.purchased ? 'Sim' : 'Não',
+      r.salary || '',
+      r.purpose || '',
+      r.motherName || '',
+      r.birthDate || '',
+      r.gender || '',
+      r.city || '',
+      r.state || '',
+      r.device || '',
+      r.os || '',
+      r.browser || '',
+      r.ip || '',
+      r.utmSource || '',
+      r.utmMedium || '',
+      r.utmCampaign || ''
+    ];
+    lines.push(line.map(escapeCsv).join(sep));
+  }
+
+  return '\uFEFF' + lines.join('\r\n');
+}
+
+  /* ---------------------- exportar leads em csv ----------------------- */
+  if ((pathname === '/api/visitors/export' || pathname === '/api/visitors/export-csv') && method === 'GET') {
+    const token = admin.extractToken(req);
+    if (!admin.getSessionByToken(token)) return fail(req, res, 401, 'Não autorizado');
+    try {
+      await store.hydrateFromSupabase();
+    } catch {}
+    store.syncOrdersToVisitors();
+
+    const q = (searchParams.get('q') || '').toLowerCase().trim();
+    const status = searchParams.get('status');
+
+    let all = null;
+    if (config.supabase?.configured) {
+      try {
+        all = await supabase.getAllVisitorsForExport({ stage: status, search: q });
+      } catch (err) {
+        console.warn('[visitors-export] Falha ao buscar lista completa do Supabase:', err.message);
+      }
+    }
+
+    if (!all || !Array.isArray(all)) {
+      all = store.listVisitors();
+      if (q) {
+        all = all.filter((v) => (v.name && v.name.toLowerCase().includes(q)) || (v.cpf && v.cpf.includes(q)) || (v.phone && v.phone.includes(q)) || (v.email && v.email.toLowerCase().includes(q)) || (v.id && v.id.includes(q)));
+      }
+      if (status && status !== 'todos') {
+        all = all.filter((v) => {
+          if (status === 'pagou_pix' || status === 'compradores' || status === 'pago') return v.purchased || v.status === 'pagou_pix';
+          if (status === 'abandono_pix') return v.status === 'abandono_pix';
+          if (status === 'abandono_funil') return v.status === 'abandono_funil' || v.status === 'abandonado';
+          if (status === 'andamento') return v.status === 'andamento' || v.status === 'em_andamento';
+          return v.status === status || v.stage === status;
+        });
+      }
+    }
+
+    const csvData = generateLeadsCsv(all);
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const filename = `leads_valore_${status && status !== 'todos' ? status + '_' : ''}${dateStr}.csv`;
+
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+    return res.end(csvData);
+  }
+
   /* -------------------------------- visitantes ------------------------------ */
   if (pathname === '/api/visitors' && method === 'GET') {
     const token = admin.extractToken(req);
