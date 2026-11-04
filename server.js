@@ -2226,9 +2226,14 @@ function generateLeadsCsv(rows = []) {
     }
 
     // Carrega o roteamento de gateways configurado criteriosamente no Painel / Supabase
+    // IMPORTANTE: sincroniza com Supabase antes de ler o gateway ativo,
+    // pois em ambientes serverless (Vercel) o estado em memória é efêmero.
+    try { await store.loadIntegrationsFromSupabase(); } catch (eSync) {
+      console.warn('[checkout] Falha ao sincronizar settings do Supabase, usando cache local:', eSync.message);
+    }
     const settings = store.getSettings() || {};
-    const primaryGateway = String(settings.activeGatewayId || 'nitropay').toLowerCase();
-    const secondaryGateway = String(settings.secondaryGatewayId || 'bspay').toLowerCase();
+    const primaryGateway = String(settings.activeGatewayId || 'bspay').toLowerCase();
+    const secondaryGateway = String(settings.secondaryGatewayId || 'nitropay').toLowerCase();
 
     const order = store.createOrder({
       visitorId,
