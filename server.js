@@ -2232,8 +2232,8 @@ function generateLeadsCsv(rows = []) {
       console.warn('[checkout] Falha ao sincronizar settings do Supabase, usando cache local:', eSync.message);
     }
     const settings = store.getSettings() || {};
-    const primaryGateway = String(settings.activeGatewayId || 'bspay').toLowerCase();
-    const secondaryGateway = String(settings.secondaryGatewayId || 'nitropay').toLowerCase();
+    const primaryGateway = String(settings.activeGatewayId || 'nitropay').toLowerCase();
+    const secondaryGateway = String(settings.secondaryGatewayId || 'none').toLowerCase();
 
     const order = store.createOrder({
       visitorId,
