@@ -52,15 +52,27 @@
   ],
   "rewrites": [
     {
-      "source": "/admin(.*)",
+      "source": "/admin",
       "destination": "/api/index?__admin_blocked=1"
     },
     {
-      "source": "/p(.*)",
+      "source": "/admin/(.*)",
       "destination": "/api/index?__admin_blocked=1"
     },
     {
-      "source": "/dash(.*)",
+      "source": "/dash",
+      "destination": "/api/index?__admin_blocked=1"
+    },
+    {
+      "source": "/dash/(.*)",
+      "destination": "/api/index?__admin_blocked=1"
+    },
+    {
+      "source": "/p",
+      "destination": "/api/index?__admin_blocked=1"
+    },
+    {
+      "source": "/p/(.*)",
       "destination": "/api/index?__admin_blocked=1"
     },
     {
