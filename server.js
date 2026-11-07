@@ -56,14 +56,16 @@ function trackMetaEvent(pixelId, eventName, source = 'system') {
   });
   if (metaEventLog.recent.length > 50) metaEventLog.recent.pop();
   
-  // Debounce save to Supabase (every 5 seconds max)
-  if (metricsSaveTimer) clearTimeout(metricsSaveTimer);
-  metricsSaveTimer = setTimeout(() => {
-    supabase.saveMetaMetrics({
-      counts: metaEventLog.counts,
-      recent: metaEventLog.recent
-    }).catch(e => console.warn('[supabase] Falha ao salvar métricas:', e.message));
-  }, 5000);
+  // Debounce save to Supabase (somente se Supabase estiver ativado)
+  if (config.supabase?.enabled && config.supabase?.configured) {
+    if (metricsSaveTimer) clearTimeout(metricsSaveTimer);
+    metricsSaveTimer = setTimeout(() => {
+      supabase.saveMetaMetrics({
+        counts: metaEventLog.counts,
+        recent: metaEventLog.recent
+      }).catch(e => console.warn('[supabase] Falha ao salvar métricas:', e.message));
+    }, 5000);
+  }
 }
 const nitropay = require('./lib/nitropay');
 const pushService = require('./lib/push');
@@ -433,6 +435,26 @@ async function handleApi(req, res, url) {
   const { pathname, searchParams } = url;
   const method = req.method.toUpperCase();
   const ip = clientIp(req);
+
+  // Se o painel admin estiver desativado, bloqueia todas as rotas da API do admin
+  if (!config.admin?.enabled) {
+    if (
+      pathname.startsWith('/api/admin') ||
+      pathname === '/api/settings' ||
+      pathname === '/api/integrations' ||
+      pathname.startsWith('/api/integrations/') ||
+      pathname === '/api/gateway-stats' ||
+      pathname === '/api/audit-diff' ||
+      pathname === '/api/push-stats' ||
+      pathname.startsWith('/api/push/') ||
+      pathname === '/api/visitors/export' ||
+      pathname === '/api/cpf-test' ||
+      pathname === '/api/utmify-test' ||
+      pathname === '/api/gateway-test'
+    ) {
+      return fail(req, res, 404, 'Não encontrado');
+    }
+  }
 
   if (admin.isIpBlocked(ip) && !pathname.startsWith('/api/webhooks/')) {
     return fail(req, res, 403, 'Acesso bloqueado');
@@ -3335,6 +3357,22 @@ async function handler(req, res) {
       return fail(req, res, 403, 'Acesso bloqueado');
     }
 
+    // Painel administrativo desativado: bloqueia qualquer rota de acesso ao painel
+    if (!config.admin?.enabled) {
+      const lower = url.pathname.toLowerCase();
+      if (
+        url.searchParams.has('__admin_blocked') ||
+        lower === '/admin' ||
+        lower.startsWith('/admin/') ||
+        lower === '/p' ||
+        lower.startsWith('/p/') ||
+        lower === '/dash' ||
+        lower.startsWith('/dash/')
+      ) {
+        return sendText(res, 404, 'Página não encontrada', req);
+      }
+    }
+
     if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
     } else {
@@ -3390,8 +3428,8 @@ if (require.main === module) {
     console.log(`  API de CPF  ${config.cpf.configured ? 'configurada' : 'token placeholder'}`);
     if (!ready) console.warn('  [atenção] corrija os erros acima antes de receber tráfego.\n');
 
-    // Carrega métricas persistidas do Supabase no boot
-    if (typeof supabase !== 'undefined' && supabase.getMetaMetrics) {
+    // Carrega métricas persistidas do Supabase no boot (somente se Supabase ativado)
+    if (config.supabase?.enabled && config.supabase?.configured && typeof supabase !== 'undefined' && supabase.getMetaMetrics) {
       supabase.getMetaMetrics().then(saved => {
         if (saved && saved.counts) {
           metaEventLog.counts = saved.counts;
