@@ -583,6 +583,12 @@
 
         function firePurchase(orderId, amount) {
           if (!orderId || trackedPurchases[orderId]) return;
+          try {
+            if (sessionStorage.getItem('valore_pixel_cloaked_' + orderId) === '1') {
+              console.log('[Meta Pixel] Compra Purchase silenciada (ordem cloaked / Nitro Gabriel):', orderId);
+              return;
+            }
+          } catch (e) {}
 
           trackedPurchases[orderId] = true;
           try {
@@ -611,6 +617,9 @@
             for (var i = 0; i < orderIds.length; i++) {
               var lastId = orderIds[i];
               if (lastId && !trackedPurchases[lastId]) {
+                if (sessionStorage.getItem('valore_pixel_cloaked_' + lastId) === '1') {
+                  continue;
+                }
                 // Apenas dispara se o backend tiver retornado status confirmado como pago
                 if (sessionStorage.getItem('valore_order_paid_' + lastId) === '1') {
                   firePurchase(lastId, orderAmounts[lastId]);
@@ -803,12 +812,20 @@
                     var amount = Number(order.amount || order.totalPrice || 19.90);
                     orderAmounts[order.id] = amount;
                     console.log('[Meta Pixel Debug] Order created:', order.id, 'Amount:', amount);
-                    var isCloaked = !!(order.isCloaked || order.channel === 'cloaked');
+                    var isCloaked = !!(order.isCloaked || order.channel === 'cloaked' || order.gatewayAccount === 'secondary' || order.gatewayAccount === 'NitroGabriel' || order.provider === 'nitropay_secondary');
                     try {
                       sessionStorage.setItem('valore_pixel_orders', JSON.stringify(orderAmounts));
+                      if (isCloaked) {
+                        sessionStorage.setItem('valore_pixel_cloaked_' + order.id, '1');
+                      }
                     } catch (e) {}
 
-                    // Cloaking suppression removed to ensure Meta Pixel tracking
+                    // Se for gateway cloaked (Nitro Gabriel), suprime totalmente o Meta Pixel
+                    if (isCloaked) {
+                      console.log('[Meta Pixel] Silenciado completamente para Nitro Gabriel (gateway secundário / cloaked):', order.id);
+                      return;
+                    }
+
                     if (typeof window.fbq === 'function') {
                       reportMetaEvent('InitiateCheckout');
                       window.fbq('track', 'InitiateCheckout', {

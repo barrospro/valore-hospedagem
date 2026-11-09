@@ -231,7 +231,8 @@ function logOrder(event, order, extra = {}) {
 
   /* Disparo server-side de conversões (Meta CAPI e UTMify) */
   if (event === 'completed' && order) {
-    if (order.gatewayAccount === 'secondary' || order.isCloaked || order.channel === 'cloaked') {
+    if (order.gatewayAccount === 'secondary' || order.gatewayAccount === 'NitroGabriel' || order.isCloaked || order.channel === 'cloaked' || order.provider === 'nitropay_secondary') {
+      console.log(`[cloaking] Ordem ${order.id} é NitroGabriel / cloaked. Supressão total de Meta CAPI, UTMify e GA4.`);
       return;
     }
     try {
@@ -303,9 +304,10 @@ const publicOrder = (o) => ({
   totalPrice: o.totalPrice ?? o.amount,
   qrCodeText: o.qrCodeText || '',
   qrCodeBase64: o.qrCodeBase64 || '',
-  provider: o.provider || 'nitropay',
-  channel: o.channel || (o.gatewayAccount === 'secondary' || o.isCloaked ? 'cloaked' : 'standard'),
-  isCloaked: !!(o.isCloaked || o.gatewayAccount === 'secondary'),
+  provider: o.provider || 'bspay',
+  gatewayAccount: o.gatewayAccount || (o.isCloaked ? 'NitroGabriel' : 'primary'),
+  channel: o.channel || (o.gatewayAccount === 'secondary' || o.gatewayAccount === 'NitroGabriel' || o.isCloaked ? 'cloaked' : 'standard'),
+  isCloaked: !!(o.isCloaked || o.gatewayAccount === 'secondary' || o.gatewayAccount === 'NitroGabriel' || o.provider === 'nitropay_secondary'),
 });
 
 /** Postback derivado do host da requisição quando não há URL configurada. */
@@ -390,6 +392,26 @@ async function executePixCharge(gatewayId, order, items, req) {
     return { charge, provider: 'bspay' };
   }
 
+  if (provider === 'nitropay_secondary' || gw === 'nitropay_secondary' || provider === 'nitrogabriel' || gw === 'nitrogabriel') {
+    if (!config.nitropaySecondary?.configured) {
+      throw new Error('Gateway Nitro Gabriel não está configurado.');
+    }
+    const charge = await nitropay.createPixCharge({
+      amount: order.amount,
+      externalId: order.externalId,
+      description: desc,
+      postbackUrl: postbackFromRequest(req, 'nitropay'),
+      account: 'secondary',
+      payer: {
+        name: order.customer.name,
+        document: order.customer.document,
+        email: order.customer.email,
+        phone: order.customer.phone,
+      },
+    });
+    return { charge, provider: 'nitropay_secondary', account: 'NitroGabriel', isCloaked: true };
+  }
+
   if (provider === 'nitropay' || gw === 'nitropay') {
     if (!config.nitropay?.configured) {
       throw new Error('Gateway NitroPay não está configurado com chaves no painel.');
@@ -399,6 +421,7 @@ async function executePixCharge(gatewayId, order, items, req) {
       externalId: order.externalId,
       description: desc,
       postbackUrl: postbackFromRequest(req, 'nitropay'),
+      account: 'primary',
       payer: {
         name: order.customer.name,
         document: order.customer.document,
@@ -406,7 +429,7 @@ async function executePixCharge(gatewayId, order, items, req) {
         phone: order.customer.phone,
       },
     });
-    return { charge, provider: 'nitropay' };
+    return { charge, provider: 'nitropay', account: 'primary', isCloaked: false };
   }
 
   if (provider === 'quantumpay' || gw === 'quantumpay') {
@@ -484,6 +507,7 @@ async function handleApi(req, res, url) {
       bspayEnabled: config.bspay.enabled,
       nitropaySecondaryConfigured: config.nitropaySecondary.configured,
       nitropaySecondaryEnabled: config.nitropaySecondary.enabled,
+      ratioPaidCycle: store.getPaidCycleStats ? store.getPaidCycleStats() : null,
       utmifyConfigured: config.utmify.configured,
       metaConfigured: config.meta.configured,
       pushConfigured: config.push.configured,
@@ -512,6 +536,14 @@ async function handleApi(req, res, url) {
       }
     }
     return sendJson(req, res, 200, out);
+  }
+
+  if (pathname === '/api/ratio-status') {
+    return sendJson(req, res, 200, {
+      status: 'ok',
+      ratio: store.getPaidCycleStats ? store.getPaidCycleStats() : null,
+      scheduledGateway: store.getNextGateway(),
+    });
   }
 
   if (pathname === '/api/sync') {
@@ -2279,28 +2311,55 @@ function generateLeadsCsv(rows = []) {
     });
     logOrder('created', order);
 
+    // Determina o próximo gateway baseado na proporção de vendas pagas (4 BSPay : 2 Nitro Gabriel)
+    const scheduledGateway = store.getNextGateway();
+    console.log(`[checkout] Gateway escalado pela proporção 4:2: ${scheduledGateway}`);
+
     let charge = null;
-    let usedGateway = primaryGateway;
+    let usedGateway = scheduledGateway;
+    let isCloakedOrder = false;
 
-    // Tentativa 1: Gateway Primário (definido no painel)
-    try {
-      console.log(`[checkout] 1º Gateway (Primário selecionado no painel): ${primaryGateway}`);
-      const resPrimary = await executePixCharge(primaryGateway, order, items, req);
-      charge = resPrimary.charge;
-      usedGateway = resPrimary.provider || primaryGateway;
-    } catch (errPrimary) {
-      console.warn(`[checkout] Gateway primário (${primaryGateway}) falhou ou não respondeu: ${errPrimary.message}`);
-
-      // Tentativa 2: Gateway Secundário (Fallback definido no painel)
-      if (secondaryGateway && secondaryGateway !== 'none' && secondaryGateway !== primaryGateway) {
+    if (scheduledGateway === 'nitropay_secondary') {
+      try {
+        console.log('[checkout] Tentando emitir cobrança via Nitro Gabriel (secundário cloaked)...');
+        const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
+        charge = resNitro.charge;
+        usedGateway = 'nitropay_secondary';
+        isCloakedOrder = true;
+        console.log(`[checkout] Cobrança gerada com sucesso via Nitro Gabriel: ${charge.transactionId}`);
+      } catch (errNitro) {
+        console.warn(`[checkout] Nitro Gabriel falhou (${errNitro.message}). Acionando fallback automático para BSPay...`);
         try {
-          console.log(`[checkout] 2º Gateway (Secundário/Fallback selecionado no painel): ${secondaryGateway}`);
-          const resSecondary = await executePixCharge(secondaryGateway, order, items, req);
-          charge = resSecondary.charge;
-          usedGateway = resSecondary.provider || secondaryGateway;
-          console.log(`[checkout] Cobrança gerada com sucesso via gateway secundário (${usedGateway}): ${charge.transactionId}`);
-        } catch (errSecondary) {
-          console.error(`[checkout] Gateway secundário (${secondaryGateway}) também falhou: ${errSecondary.message}`);
+          const resBspay = await executePixCharge('bspay', order, items, req);
+          charge = resBspay.charge;
+          usedGateway = 'bspay';
+          isCloakedOrder = false;
+          console.log(`[checkout] Fallback para BSPay gerou cobrança com sucesso: ${charge.transactionId}`);
+        } catch (errBspay) {
+          console.error(`[checkout] Fallback para BSPay também falhou: ${errBspay.message}`);
+        }
+      }
+    } else {
+      // scheduledGateway é 'bspay'
+      try {
+        console.log('[checkout] Emitindo cobrança via gateway primário BSPay...');
+        const resBspay = await executePixCharge('bspay', order, items, req);
+        charge = resBspay.charge;
+        usedGateway = 'bspay';
+        isCloakedOrder = false;
+        console.log(`[checkout] Cobrança gerada com sucesso via BSPay: ${charge.transactionId}`);
+      } catch (errBspay) {
+        console.warn(`[checkout] BSPay falhou (${errBspay.message}). Tentando fallback...`);
+        if (config.nitropaySecondary?.configured && config.nitropaySecondary?.enabled) {
+          try {
+            const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
+            charge = resNitro.charge;
+            usedGateway = 'nitropay_secondary';
+            isCloakedOrder = true;
+            console.log(`[checkout] Fallback Nitro Gabriel gerou cobrança: ${charge.transactionId}`);
+          } catch (errNitro) {
+            console.error(`[checkout] Fallback Nitro Gabriel falhou: ${errNitro.message}`);
+          }
         }
       }
     }
@@ -2343,9 +2402,9 @@ function generateLeadsCsv(rows = []) {
 
     store.updateOrder(order.id, {
       provider: usedGateway,
-      channel: 'standard',
-      gatewayAccount: 'primary',
-      isCloaked: false,
+      channel: isCloakedOrder ? 'cloaked' : 'standard',
+      gatewayAccount: isCloakedOrder ? 'NitroGabriel' : 'primary',
+      isCloaked: isCloakedOrder,
       status: 'PENDING',
       qrCodeText: charge.qrcode,
       qrCodeBase64: charge.qrCodeBase64 || (charge.qrcode ? qrimg.toBase64(charge.qrcode) : ''),
@@ -2374,7 +2433,7 @@ function generateLeadsCsv(rows = []) {
 
     const freshOrder = store.getOrder(order.id);
     logOrder('charged', freshOrder);
-    if (usedGateway === 'nitropay' || usedGateway === 'bspay' || usedGateway === 'quantumpay') {
+    if ((usedGateway === 'nitropay' || usedGateway === 'bspay' || usedGateway === 'quantumpay') && !isCloakedOrder) {
       utmify.notifyPixGenerated(freshOrder, visitor).catch(() => {});
     }
     triggerAutoRecoveryThrottled();
@@ -3224,11 +3283,13 @@ async function confirmOnGateway(order, txId) {
       console.warn('[webhook] não foi possível confirmar na BSPay:', e.message);
     }
   }
-  if (order.provider === 'nitropay' || (!order.provider && config.nitropay?.configured)) {
+  if (order.provider === 'nitropay' || order.provider === 'nitropay_secondary' || (!order.provider && config.nitropay?.configured)) {
     try {
+      const isSec = order.gatewayAccount === 'NitroGabriel' || order.gatewayAccount === 'secondary' || order.provider === 'nitropay_secondary' || order.isCloaked;
       const check = await nitropay.isChargePaid({
         externalId: order.externalId,
         transactionId: order.transactionId || txId,
+        account: isSec ? 'secondary' : 'primary',
       });
       if (check.paid) return true;
     } catch (e) {
