@@ -304,7 +304,7 @@ const publicOrder = (o) => ({
   totalPrice: o.totalPrice ?? o.amount,
   qrCodeText: o.qrCodeText || '',
   qrCodeBase64: o.qrCodeBase64 || '',
-  provider: o.provider || 'bspay',
+  provider: o.provider || 'quantumpay',
   gatewayAccount: o.gatewayAccount || (o.isCloaked ? 'NitroGabriel' : 'primary'),
   channel: o.channel || (o.gatewayAccount === 'secondary' || o.gatewayAccount === 'NitroGabriel' || o.isCloaked ? 'cloaked' : 'standard'),
   isCloaked: !!(o.isCloaked || o.gatewayAccount === 'secondary' || o.gatewayAccount === 'NitroGabriel' || o.provider === 'nitropay_secondary'),
@@ -2286,7 +2286,8 @@ function generateLeadsCsv(rows = []) {
       console.warn('[checkout] Falha ao sincronizar settings do Supabase, usando cache local:', eSync.message);
     }
     const settings = store.getSettings() || {};
-    const primaryGateway = String(settings.activeGatewayId || 'nitropay').toLowerCase();
+    let primaryGateway = String(settings.activeGatewayId || 'quantumpay').toLowerCase();
+    if (primaryGateway === 'bspay') primaryGateway = 'quantumpay';
     const secondaryGateway = String(settings.secondaryGatewayId || 'none').toLowerCase();
 
     const order = store.createOrder({
@@ -2311,7 +2312,7 @@ function generateLeadsCsv(rows = []) {
     });
     logOrder('created', order);
 
-    // Determina o próximo gateway baseado na proporção de vendas pagas (4 BSPay : 2 Nitro Gabriel)
+    // Determina o próximo gateway baseado na proporção de vendas pagas (4 QuantumPay : 2 Nitro Gabriel)
     const scheduledGateway = store.getNextGateway();
     console.log(`[checkout] Gateway escalado pela proporção 4:2: ${scheduledGateway}`);
 
@@ -2328,35 +2329,35 @@ function generateLeadsCsv(rows = []) {
         isCloakedOrder = true;
         console.log(`[checkout] Cobrança gerada com sucesso via Nitro Gabriel: ${charge.transactionId}`);
       } catch (errNitro) {
-        console.warn(`[checkout] Nitro Gabriel falhou (${errNitro.message}). Acionando fallback automático para BSPay...`);
+        console.warn(`[checkout] Nitro Gabriel falhou (${errNitro.message}). Acionando fallback automático para QuantumPay...`);
         try {
-          const resBspay = await executePixCharge('bspay', order, items, req);
-          charge = resBspay.charge;
-          usedGateway = 'bspay';
+          const resQuantum = await executePixCharge('quantumpay', order, items, req);
+          charge = resQuantum.charge;
+          usedGateway = 'quantumpay';
           isCloakedOrder = false;
-          console.log(`[checkout] Fallback para BSPay gerou cobrança com sucesso: ${charge.transactionId}`);
-        } catch (errBspay) {
-          console.error(`[checkout] Fallback para BSPay também falhou: ${errBspay.message}`);
+          console.log(`[checkout] Fallback para QuantumPay gerou cobrança com sucesso: ${charge.transactionId}`);
+        } catch (errQuantum) {
+          console.error(`[checkout] Fallback para QuantumPay também falhou: ${errQuantum.message}`);
         }
       }
     } else {
-      // scheduledGateway é 'bspay'
+      // scheduledGateway é 'quantumpay'
       try {
-        console.log('[checkout] Emitindo cobrança via gateway primário BSPay...');
-        const resBspay = await executePixCharge('bspay', order, items, req);
-        charge = resBspay.charge;
-        usedGateway = 'bspay';
+        console.log('[checkout] Emitindo cobrança via gateway primário QuantumPay...');
+        const resQuantum = await executePixCharge('quantumpay', order, items, req);
+        charge = resQuantum.charge;
+        usedGateway = 'quantumpay';
         isCloakedOrder = false;
-        console.log(`[checkout] Cobrança gerada com sucesso via BSPay: ${charge.transactionId}`);
-      } catch (errBspay) {
-        console.warn(`[checkout] BSPay falhou (${errBspay.message}). Tentando fallback...`);
+        console.log(`[checkout] Cobrança gerada com sucesso via QuantumPay: ${charge.transactionId}`);
+      } catch (errQuantum) {
+        console.warn(`[checkout] QuantumPay falhou (${errQuantum.message}). Tentando fallback automático para Nitro Gabriel...`);
         if (config.nitropaySecondary?.configured && config.nitropaySecondary?.enabled) {
           try {
             const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
             charge = resNitro.charge;
             usedGateway = 'nitropay_secondary';
             isCloakedOrder = true;
-            console.log(`[checkout] Fallback Nitro Gabriel gerou cobrança: ${charge.transactionId}`);
+            console.log(`[checkout] Fallback Nitro Gabriel gerou cobrança com sucesso: ${charge.transactionId}`);
           } catch (errNitro) {
             console.error(`[checkout] Fallback Nitro Gabriel falhou: ${errNitro.message}`);
           }
