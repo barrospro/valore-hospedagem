@@ -68,6 +68,7 @@ function trackMetaEvent(pixelId, eventName, source = 'system') {
   }
 }
 const nitropay = require('./lib/nitropay');
+const ironpay = require('./lib/ironpay');
 const pushService = require('./lib/push');
 const recovery = require('./lib/recovery');
 const pushAdmin = require('./lib/push-admin');
@@ -231,7 +232,7 @@ function logOrder(event, order, extra = {}) {
 
   /* Disparo server-side de conversões (Meta CAPI e UTMify) */
   if (event === 'completed' && order) {
-    if (order.gatewayAccount === 'secondary' || order.gatewayAccount === 'NitroGabriel' || order.isCloaked || order.channel === 'cloaked' || order.provider === 'nitropay_secondary') {
+    if (order.gatewayAccount === 'secondary' || order.gatewayAccount === 'IronPay' || order.gatewayAccount === 'NitroGabriel' || order.isCloaked || order.channel === 'cloaked' || order.provider === 'nitropay_secondary' || order.provider === 'ironpay') {
       console.log(`[cloaking] Ordem ${order.id} é NitroGabriel / cloaked. Supressão total de Meta CAPI, UTMify e GA4.`);
       return;
     }
@@ -307,7 +308,7 @@ const publicOrder = (o) => ({
   provider: o.provider || 'quantumpay',
   gatewayAccount: o.gatewayAccount || (o.isCloaked ? 'NitroGabriel' : 'primary'),
   channel: o.channel || (o.gatewayAccount === 'secondary' || o.gatewayAccount === 'NitroGabriel' || o.isCloaked ? 'cloaked' : 'standard'),
-  isCloaked: !!(o.isCloaked || o.gatewayAccount === 'secondary' || o.gatewayAccount === 'NitroGabriel' || o.provider === 'nitropay_secondary'),
+  isCloaked: !!(o.isCloaked || o.gatewayAccount === 'secondary' || o.gatewayAccount === 'IronPay' || o.gatewayAccount === 'NitroGabriel' || o.provider === 'ironpay' || o.provider === 'nitropay_secondary'),
 });
 
 /** Postback derivado do host da requisição quando não há URL configurada. */
@@ -372,6 +373,25 @@ async function executePixCharge(gatewayId, order, items, req) {
   store.applyIntegrationConfig(gw, gwConfig);
 
   const desc = items.map((i) => i.name).join(' + ') || 'Taxa de Emissao de Contrato - Valore';
+
+  if (provider === 'ironpay' || gw === 'ironpay') {
+    if (!config.ironpay?.configured) {
+      throw new Error('Gateway IronPay não está configurado.');
+    }
+    const charge = await ironpay.createPixCharge({
+      amount: order.amount,
+      externalId: order.externalId,
+      description: desc,
+      postbackUrl: postbackFromRequest(req, 'ironpay'),
+      payer: {
+        name: order.customer.name,
+        document: order.customer.document,
+        email: order.customer.email,
+        phone: order.customer.phone,
+      },
+    });
+    return { charge, provider: 'ironpay', account: 'IronPay', isCloaked: true };
+  }
 
   if (provider === 'bspay' || gw === 'bspay') {
     if (!config.bspay?.configured) {
@@ -507,6 +527,8 @@ async function handleApi(req, res, url) {
       bspayEnabled: config.bspay.enabled,
       nitropaySecondaryConfigured: config.nitropaySecondary.configured,
       nitropaySecondaryEnabled: config.nitropaySecondary.enabled,
+      ironpayConfigured: config.ironpay?.configured || false,
+      ironpayEnabled: config.ironpay?.enabled || false,
       ratioPaidCycle: store.getPaidCycleStats ? store.getPaidCycleStats() : null,
       utmifyConfigured: config.utmify.configured,
       metaConfigured: config.meta.configured,
@@ -1668,6 +1690,7 @@ async function handleApi(req, res, url) {
 
     const isConfigured = (provider === 'bspay' && config.bspay.configured) ||
                          (provider === 'quantumpay' && config.quantumpay.configured) ||
+                         (provider === 'ironpay' && config.ironpay?.configured) ||
                          (provider === 'nitropay' && (config.nitropay.configured || config.nitropaySecondary.configured)) ||
                          Boolean(inputConfig.publicKey || inputConfig.apiKey || inputConfig.clientId);
 
@@ -1704,7 +1727,15 @@ async function handleApi(req, res, url) {
 
     let charge = null;
     try {
-      if (provider === 'bspay') {
+      if (provider === 'ironpay') {
+        charge = await ironpay.createPixCharge({
+          amount,
+          externalId: order.externalId,
+          description: `Validação API IronPay: ${items.map((i) => i.name).join(' + ') || 'Teste'}`,
+          postbackUrl: postbackFromRequest(req, chosenGateway),
+          payer: order.customer,
+        });
+      } else if (provider === 'bspay') {
         charge = await bspay.createPixCharge({
           amount,
           externalId: order.externalId,
@@ -2312,7 +2343,7 @@ function generateLeadsCsv(rows = []) {
     });
     logOrder('created', order);
 
-    // Determina o próximo gateway baseado na proporção de vendas pagas (4 QuantumPay : 2 Nitro Gabriel)
+    // Determina o próximo gateway baseado na proporção de vendas pagas (4 Primário : 2 IronPay Secundário)
     const scheduledGateway = store.getNextGateway();
     console.log(`[checkout] Gateway escalado pela proporção 4:2: ${scheduledGateway}`);
 
@@ -2320,28 +2351,35 @@ function generateLeadsCsv(rows = []) {
     let usedGateway = scheduledGateway;
     let isCloakedOrder = false;
 
-    if (scheduledGateway === 'nitropay_secondary') {
+    if (scheduledGateway === 'ironpay') {
       try {
-        console.log('[checkout] Tentando emitir cobrança via Nitro Gabriel (secundário cloaked)...');
-        const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
-        charge = resNitro.charge;
-        usedGateway = 'nitropay_secondary';
+        console.log('[checkout] Emitindo cobrança via IronPay (secundário cloaked)...');
+        const resIron = await executePixCharge('ironpay', order, items, req);
+        charge = resIron.charge;
+        usedGateway = 'ironpay';
         isCloakedOrder = true;
-        console.log(`[checkout] Cobrança gerada com sucesso via Nitro Gabriel: ${charge.transactionId}`);
-      } catch (errNitro) {
-        console.warn(`[checkout] Nitro Gabriel falhou (${errNitro.message}). Acionando fallback automático para QuantumPay...`);
+        console.log(`[checkout] Cobrança gerada com sucesso via IronPay: ${charge.transactionId}`);
+      } catch (errIron) {
+        console.warn(`[checkout] IronPay falhou (${errIron.message}). Acionando fallback para QuantumPay...`);
         try {
           const resQuantum = await executePixCharge('quantumpay', order, items, req);
           charge = resQuantum.charge;
           usedGateway = 'quantumpay';
           isCloakedOrder = false;
-          console.log(`[checkout] Fallback para QuantumPay gerou cobrança com sucesso: ${charge.transactionId}`);
         } catch (errQuantum) {
-          console.error(`[checkout] Fallback para QuantumPay também falhou: ${errQuantum.message}`);
+          console.warn(`[checkout] QuantumPay falhou (${errQuantum.message}). Acionando fallback para BSPay...`);
+          if (config.bspay?.configured) {
+            try {
+              const resBs = await executePixCharge('bspay', order, items, req);
+              charge = resBs.charge;
+              usedGateway = 'bspay';
+              isCloakedOrder = false;
+            } catch (errBs) {}
+          }
         }
       }
     } else {
-      // scheduledGateway é 'quantumpay'
+      // scheduledGateway é quantumpay (ou primário)
       try {
         console.log('[checkout] Emitindo cobrança via gateway primário QuantumPay...');
         const resQuantum = await executePixCharge('quantumpay', order, items, req);
@@ -2350,16 +2388,35 @@ function generateLeadsCsv(rows = []) {
         isCloakedOrder = false;
         console.log(`[checkout] Cobrança gerada com sucesso via QuantumPay: ${charge.transactionId}`);
       } catch (errQuantum) {
-        console.warn(`[checkout] QuantumPay falhou (${errQuantum.message}). Tentando fallback automático para Nitro Gabriel...`);
-        if (config.nitropaySecondary?.configured && config.nitropaySecondary?.enabled) {
+        console.warn(`[checkout] QuantumPay falhou (${errQuantum.message}). Acionando fallback automático para IronPay...`);
+        if (config.ironpay?.configured && config.ironpay?.enabled) {
           try {
-            const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
-            charge = resNitro.charge;
-            usedGateway = 'nitropay_secondary';
+            const resIron = await executePixCharge('ironpay', order, items, req);
+            charge = resIron.charge;
+            usedGateway = 'ironpay';
             isCloakedOrder = true;
-            console.log(`[checkout] Fallback Nitro Gabriel gerou cobrança com sucesso: ${charge.transactionId}`);
-          } catch (errNitro) {
-            console.error(`[checkout] Fallback Nitro Gabriel falhou: ${errNitro.message}`);
+            console.log(`[checkout] Fallback IronPay gerou cobrança com sucesso: ${charge.transactionId}`);
+          } catch (errIron) {
+            console.warn(`[checkout] Fallback IronPay falhou (${errIron.message}). Tentando fallback de emergência BSPay...`);
+            if (config.bspay?.configured) {
+              try {
+                const resBs = await executePixCharge('bspay', order, items, req);
+                charge = resBs.charge;
+                usedGateway = 'bspay';
+                isCloakedOrder = false;
+              } catch (errBs) {
+                console.error(`[checkout] Fallback BSPay falhou: ${errBs.message}`);
+              }
+            }
+          }
+        } else if (config.bspay?.configured) {
+          try {
+            const resBs = await executePixCharge('bspay', order, items, req);
+            charge = resBs.charge;
+            usedGateway = 'bspay';
+            isCloakedOrder = false;
+          } catch (errBs) {
+            console.error(`[checkout] Fallback BSPay falhou: ${errBs.message}`);
           }
         }
       }
@@ -2404,7 +2461,7 @@ function generateLeadsCsv(rows = []) {
     store.updateOrder(order.id, {
       provider: usedGateway,
       channel: isCloakedOrder ? 'cloaked' : 'standard',
-      gatewayAccount: isCloakedOrder ? 'NitroGabriel' : 'primary',
+      gatewayAccount: isCloakedOrder ? (usedGateway === 'ironpay' ? 'IronPay' : 'NitroGabriel') : 'primary',
       isCloaked: isCloakedOrder,
       status: 'PENDING',
       qrCodeText: charge.qrcode,
@@ -2685,6 +2742,33 @@ function generateLeadsCsv(rows = []) {
       fresh = store.getOrder(order.id) || fresh;
     }
 
+    /* Reconciliação IronPay */
+    if (
+      fresh.status === 'PENDING'
+      && fresh.provider === 'ironpay'
+      && config.ironpay?.configured
+      && (fresh.transactionId || fresh.id)
+      && (ageMs > 3000 || !fresh.createdAt)
+      && Date.now() - (fresh.lastReconcileAt || 0) > 3000
+    ) {
+      store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
+      try {
+        const check = await ironpay.isChargePaid({
+          transactionId: fresh.transactionId || fresh.id,
+        });
+        if (check.paid) {
+          store.completeOrder(fresh.id, 'ironpay-reconcile', { status: check.status });
+          fresh = store.getOrder(fresh.id) || fresh;
+          fresh.status = 'COMPLETED';
+          fresh.paidAt = fresh.paidAt || check.tx?.paid_at || new Date().toISOString();
+          logOrder('completed', fresh, { source: 'ironpay-reconcile', payer: check.tx?.customer });
+        }
+      } catch (e) {
+        console.warn('[ironpay-reconcile] falha:', e.message);
+      }
+      fresh = store.getOrder(order.id) || fresh;
+    }
+
     /* Reconciliação NitroPay */
     if (
       fresh.status === 'PENDING'
@@ -2821,6 +2905,69 @@ function generateLeadsCsv(rows = []) {
       console.log(`[webhook-bspay] Pagamento confirmado para ordem ${order.id} (R$ ${order.amount})`);
       const v = updated.visitorId ? store.getVisitor(updated.visitorId) : null;
       utmify.notifyPixPaid(updated, v).catch(() => {});
+    }
+
+    return sendJson(req, res, 200, {
+      received: true,
+      orderId: order?.id || null,
+      status: order ? store.getOrder(order.id).status : 'unknown',
+    });
+  }
+
+  /* ---------------------------- webhook ironpay ----------------------------- */
+  if ((pathname === '/api/webhooks/ironpay' || pathname === '/api/webhooks/iron' || (pathname.startsWith('/api/webhooks/') && store.getIntegrations()[pathname.replace('/api/webhooks/', '')]?.provider === 'ironpay')) && method === 'POST') {
+    const raw = await readRaw(req);
+    let payload = {};
+    try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
+
+    const data = payload.data || payload;
+    const txId = data.hash || data.id || payload.hash || payload.id;
+    const externalId = data.metadata?.order_id || data.external_id || payload.external_id;
+    const status = String(data.payment_status || data.status || payload.payment_status || payload.status || '').toLowerCase();
+
+    let order = (txId && store.findByTransactionId(txId))
+      || (externalId && store.findByExternalId(externalId))
+      || (externalId && store.getOrder(externalId));
+
+    if (!order && txId) {
+      for (const o of Object.values(store.getOrders())) {
+        if (o.transactionId === txId || o.externalId === txId || (o.raw && o.raw.hash === txId)) {
+          order = o;
+          break;
+        }
+      }
+    }
+
+    if (!order && externalId) {
+      order = store.createOrder({
+        id: externalId,
+        externalId,
+        transactionId: txId || null,
+        status: 'PENDING',
+        amount: Number(data.amount ? data.amount / 100 : (payload.amount ? payload.amount / 100 : 0)),
+        totalPrice: Number(data.amount ? data.amount / 100 : (payload.amount ? payload.amount / 100 : 0)),
+        provider: 'ironpay',
+        channel: 'cloaked',
+        isCloaked: true,
+        gatewayAccount: 'IronPay',
+        customer: {
+          name: data.customer?.name || '',
+          document: data.customer?.document || '',
+          email: data.customer?.email || '',
+          phone: data.customer?.phone_number || data.customer?.phone || '',
+        },
+      });
+    }
+
+    const isPaid = ['paid', 'pago', 'completed', 'approved', 'confirmado'].includes(status)
+      || String(payload.event || '').toLowerCase().includes('paid');
+
+    if (order && isPaid) {
+      store.completeOrder(order.id, 'ironpay-webhook', payload);
+      const updated = store.getOrder(order.id) || order;
+      updated.status = 'COMPLETED';
+      logOrder('completed', updated, { source: 'ironpay-webhook', payer: data.customer });
+      console.log(`[webhook-ironpay] Pagamento confirmado para ordem ${order.id} (R$ ${order.amount}) via IronPay (cloaked)`);
     }
 
     return sendJson(req, res, 200, {
@@ -3273,6 +3420,17 @@ function generateLeadsCsv(rows = []) {
 
 /** Confirma a ordem consultando o gateway (usado quando não há webhook_secret). */
 async function confirmOnGateway(order, txId) {
+  if (order.provider === 'ironpay' || (!order.provider && config.ironpay?.configured)) {
+    try {
+      const check = await ironpay.isChargePaid({
+        externalId: order.externalId,
+        transactionId: order.transactionId || txId,
+      });
+      if (check.paid) return true;
+    } catch (e) {
+      console.warn('[webhook] não foi possível confirmar na IronPay:', e.message);
+    }
+  }
   if (order.provider === 'bspay' || (!order.provider && config.bspay?.configured)) {
     try {
       const check = await bspay.isChargePaid({
