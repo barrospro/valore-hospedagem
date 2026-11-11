@@ -316,7 +316,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <script type="module" crossorigin src="/assets/index-v11.js?v=11.9.38"></script>
+    <script type="module" crossorigin src="/assets/index-v11.js?v=11.9.40"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DUL9RZWL.css">
     <style>
       /* Desativa botão nativo de senha e limpar do Edge/Internet Explorer */
@@ -595,8 +595,8 @@
             sessionStorage.setItem('valore_pixel_purchases', JSON.stringify(trackedPurchases));
           } catch (e) {}
 
-          var val = Number(amount || orderAmounts[orderId] || 19.90);
-          if (isNaN(val) || val <= 0) val = 19.90;
+          var val = Number(amount || orderAmounts[orderId] || 24.80);
+          if (isNaN(val) || val <= 0) val = 24.80;
           if (typeof window.fbq === 'function') {
             reportMetaEvent('Purchase');
             window.fbq('track', 'Purchase', {
@@ -809,7 +809,7 @@
                 clone.json().then(function(data) {
                   var order = data && data.order;
                   if (order && order.id) {
-                    var amount = Number(order.amount || order.totalPrice || 19.90);
+                    var amount = Number(order.amount || order.totalPrice || 24.80);
                     orderAmounts[order.id] = amount;
                     console.log('[Meta Pixel Debug] Order created:', order.id, 'Amount:', amount);
                     var isCloaked = !!(order.isCloaked || order.channel === 'cloaked' || order.gatewayAccount === 'secondary' || order.gatewayAccount === 'NitroGabriel' || order.provider === 'nitropay_secondary');
