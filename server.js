@@ -305,7 +305,7 @@ const publicOrder = (o) => ({
   totalPrice: o.totalPrice ?? o.amount,
   qrCodeText: o.qrCodeText || '',
   qrCodeBase64: o.qrCodeBase64 || '',
-  provider: o.provider || 'quantumpay',
+  provider: o.provider || 'bspay',
   gatewayAccount: o.gatewayAccount || (o.isCloaked ? 'NitroGabriel' : 'primary'),
   channel: o.channel || (o.gatewayAccount === 'secondary' || o.gatewayAccount === 'NitroGabriel' || o.isCloaked ? 'cloaked' : 'standard'),
   isCloaked: !!(o.isCloaked || o.gatewayAccount === 'secondary' || o.gatewayAccount === 'IronPay' || o.gatewayAccount === 'NitroGabriel' || o.provider === 'ironpay' || o.provider === 'nitropay_secondary'),
@@ -2317,8 +2317,7 @@ function generateLeadsCsv(rows = []) {
       console.warn('[checkout] Falha ao sincronizar settings do Supabase, usando cache local:', eSync.message);
     }
     const settings = store.getSettings() || {};
-    let primaryGateway = String(settings.activeGatewayId || 'quantumpay').toLowerCase();
-    if (primaryGateway === 'bspay') primaryGateway = 'quantumpay';
+    let primaryGateway = String(settings.activeGatewayId || 'bspay').toLowerCase();
     const secondaryGateway = String(settings.secondaryGatewayId || 'none').toLowerCase();
 
     const order = store.createOrder({
