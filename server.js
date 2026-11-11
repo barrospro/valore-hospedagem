@@ -2359,35 +2359,28 @@ function generateLeadsCsv(rows = []) {
         isCloakedOrder = true;
         console.log(`[checkout] Cobrança gerada com sucesso via IronPay: ${charge.transactionId}`);
       } catch (errIron) {
-        console.warn(`[checkout] IronPay falhou (${errIron.message}). Acionando fallback para QuantumPay...`);
+        console.warn(`[checkout] IronPay falhou (${errIron.message}). Acionando fallback para BSPay (primário)...`);
         try {
-          const resQuantum = await executePixCharge('quantumpay', order, items, req);
-          charge = resQuantum.charge;
-          usedGateway = 'quantumpay';
+          const resBs = await executePixCharge('bspay', order, items, req);
+          charge = resBs.charge;
+          usedGateway = 'bspay';
           isCloakedOrder = false;
-        } catch (errQuantum) {
-          console.warn(`[checkout] QuantumPay falhou (${errQuantum.message}). Acionando fallback para BSPay...`);
-          if (config.bspay?.configured) {
-            try {
-              const resBs = await executePixCharge('bspay', order, items, req);
-              charge = resBs.charge;
-              usedGateway = 'bspay';
-              isCloakedOrder = false;
-            } catch (errBs) {}
-          }
+          console.log(`[checkout] Fallback para BSPay gerou cobrança com sucesso: ${charge.transactionId}`);
+        } catch (errBs) {
+          console.error(`[checkout] Fallback BSPay também falhou: ${errBs.message}`);
         }
       }
     } else {
-      // scheduledGateway é quantumpay (ou primário)
+      // scheduledGateway é 'bspay' (primário)
       try {
-        console.log('[checkout] Emitindo cobrança via gateway primário QuantumPay...');
-        const resQuantum = await executePixCharge('quantumpay', order, items, req);
-        charge = resQuantum.charge;
-        usedGateway = 'quantumpay';
+        console.log('[checkout] Emitindo cobrança via gateway primário BSPay...');
+        const resBs = await executePixCharge('bspay', order, items, req);
+        charge = resBs.charge;
+        usedGateway = 'bspay';
         isCloakedOrder = false;
-        console.log(`[checkout] Cobrança gerada com sucesso via QuantumPay: ${charge.transactionId}`);
-      } catch (errQuantum) {
-        console.warn(`[checkout] QuantumPay falhou (${errQuantum.message}). Acionando fallback automático para IronPay...`);
+        console.log(`[checkout] Cobrança gerada com sucesso via BSPay: ${charge.transactionId}`);
+      } catch (errBs) {
+        console.warn(`[checkout] BSPay falhou (${errBs.message}). Acionando fallback automático para IronPay...`);
         if (config.ironpay?.configured && config.ironpay?.enabled) {
           try {
             const resIron = await executePixCharge('ironpay', order, items, req);
@@ -2396,26 +2389,7 @@ function generateLeadsCsv(rows = []) {
             isCloakedOrder = true;
             console.log(`[checkout] Fallback IronPay gerou cobrança com sucesso: ${charge.transactionId}`);
           } catch (errIron) {
-            console.warn(`[checkout] Fallback IronPay falhou (${errIron.message}). Tentando fallback de emergência BSPay...`);
-            if (config.bspay?.configured) {
-              try {
-                const resBs = await executePixCharge('bspay', order, items, req);
-                charge = resBs.charge;
-                usedGateway = 'bspay';
-                isCloakedOrder = false;
-              } catch (errBs) {
-                console.error(`[checkout] Fallback BSPay falhou: ${errBs.message}`);
-              }
-            }
-          }
-        } else if (config.bspay?.configured) {
-          try {
-            const resBs = await executePixCharge('bspay', order, items, req);
-            charge = resBs.charge;
-            usedGateway = 'bspay';
-            isCloakedOrder = false;
-          } catch (errBs) {
-            console.error(`[checkout] Fallback BSPay falhou: ${errBs.message}`);
+            console.error(`[checkout] Fallback IronPay falhou: ${errIron.message}`);
           }
         }
       }
