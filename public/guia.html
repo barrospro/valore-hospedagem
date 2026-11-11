@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Área de Acesso: Manual do Score & Crédito Aprovado | Valore Brasil</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09131f;
+      --card-bg: #0f1f33;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 18px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(9, 19, 31, 0.8);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: white;
+      font-weight: 800;
+      font-size: 19px;
+    }
+    .brand span { color: var(--accent); }
+    .badge-paid {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--accent);
+      color: #34d399;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* HERO / DOWNLOAD BAR */
+    .hero {
+      max-width: 960px;
+      margin: 40px auto 30px;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1.25;
+      margin-bottom: 12px;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      color: var(--text-muted);
+      font-size: 16px;
+      max-width: 650px;
+      margin: 0 auto 30px;
+      line-height: 1.6;
+    }
+    .download-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+    .btn-download {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 16px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s ease;
+    }
+    .btn-download:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(16, 185, 129, 0.45);
+    }
+    .btn-read {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      padding: 16px 28px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+    .btn-read:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* LEITOR INTEGRADO / CARD DO E-BOOK */
+    .reader-card {
+      max-width: 860px;
+      margin: 0 auto 60px;
+      background: #ffffff;
+      color: #334155;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      font-family: 'Merriweather', serif;
+      line-height: 1.8;
+      font-size: 15px;
+    }
+    .reader-header {
+      background: #0f172a;
+      color: white;
+      padding: 24px 35px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .reader-header h3 { font-size: 16px; font-weight: 700; }
+    .reader-header a {
+      color: #34d399;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .reader-body {
+      padding: 45px 50px;
+    }
+    .reader-body h2 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 40px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .reader-body h3 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 25px 0 12px;
+    }
+    .reader-body p { margin-bottom: 18px; text-align: justify; }
+    .reader-body ul { margin: 0 0 20px 24px; }
+    .reader-body li { margin-bottom: 8px; }
+
+    .callout {
+      background: #f8fafc;
+      border-left: 4px solid #10b981;
+      padding: 18px 22px;
+      margin: 25px 0;
+      border-radius: 0 10px 10px 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px;
+    }
+    .callout strong { color: #0f172a; display: block; margin-bottom: 4px; }
+
+    .template-box {
+      background: #f8fafc;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      padding: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      margin: 20px 0;
+      line-height: 1.5;
+      color: #0f172a;
+    }
+
+    footer {
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      padding: 25px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 26px; }
+      .reader-body { padding: 25px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="brand">Valore<span>Brasil</span></a>
+    <div class="badge-paid">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      Acesso Liberado
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Seu <span>Manual do Score &amp; Crédito Aprovado</span> está pronto!</h1>
+      <p>Acesse seu guia completo abaixo para aprender a higienizar seu CPF, limpar restrições do Banco Central e destravar linhas de crédito pré-aprovadas.</p>
+
+      <div class="download-actions">
+        <a href="/downloads/manual-score-credito-aprovado.pdf" download="Manual-Score-Credito-Aprovado-Valore.pdf" class="btn-download">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Baixar E-book Oficial (PDF)
+        </a>
+        <a href="#leitor" class="btn-read">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+          Ler Online no Navegador
+        </a>
+      </div>
+    </section>
+
+    <!-- LEITOR INTEGRADO -->
+    <div class="reader-card" id="leitor">
+      <div class="reader-header">
+        <h3>Manual do Score &amp; Crédito Aprovado — Leitura Online</h3>
+        <a href="/downloads/manual-score-credito-aprovado.pdf" download>Salvar em PDF</a>
+      </div>
+
+      <div class="reader-body">
+        <div class="callout">
+          <strong>🔒 Material Oficial Registrado • Valore Brasil</strong>
+          Guia prático de reabilitação e concessão de crédito formulado por especialistas em análise de risco bancário.
+        </div>
+
+        <h2>Capítulo 1: O Segredo dos Algoritmos de Score</h2>
+        <p>A pontuação de crédito (calculada por birôs como Serasa, SPC e Boa Vista) não é apenas pagar contas em dia: ela mede a probabilidade estatística de inadimplência em 12 meses. O algoritmo é baseado em 4 grandes pilares:</p>
+        <ul>
+          <li><strong>45% Pontualidade de Pagamentos:</strong> Contas essenciais e faturas pagas até o dia exato do vencimento.</li>
+          <li><strong>25% Histórico de Restrições:</strong> Ausência de protestos, cheques devolvidos e pendências nos órgãos de proteção.</li>
+          <li><strong>15% Consultas Recentes:</strong> Múltiplas buscas ao CPF em curto espaço de tempo acionam alerta de risco.</li>
+          <li><strong>15% Dados Cadastrais:</strong> Cadastro Positivo ativado, endereço e renda atualizados.</li>
+        </ul>
+
+        <h2>Capítulo 2: A Lista Oculta do Banco Central (Registrato / SCR)</h2>
+        <p>Muitas pessoas limpam o nome no Serasa e continuam sem crédito porque constam no <strong>SCR (Sistema de Informações de Crédito) do Banco Central</strong> como <em>"Dívidas Baixadas com Prejuízo"</em>.</p>
+        <p>Para emitir seu relatório gratuito:</p>
+        <ol>
+          <li>Acesse <strong>registrato.bcb.gov.br</strong> e entre com sua conta Gov.br (Prata ou Ouro).</li>
+          <li>Acesse a aba "Empréstimos e Financiamentos (SCR)" e gere o extrato dos últimos 24 a 60 meses.</li>
+          <li>Identifique se há valor apontado como "Prejuízo". Se a dívida já foi quitada ou prescreveu (mais de 5 anos), a manutenção dessa anotação é ilegal.</li>
+        </ol>
+
+        <h2>Capítulo 3: O Cronograma dos 7 Dias</h2>
+        <ul>
+          <li><strong>Dia 1:</strong> Atualize seus dados cadastrais (CEP e telefone) no Serasa e Boa Vista.</li>
+          <li><strong>Dia 2:</strong> Ative o Cadastro Positivo focado em pagamentos recentes.</li>
+          <li><strong>Dia 3:</strong> Exclua o histórico de consultas excessivas ao seu CPF no portal dos birôs.</li>
+          <li><strong>Dia 4:</strong> Coloque 2 contas mensais em débito automático em uma conta principal.</li>
+          <li><strong>Dia 5:</strong> Cadastre sua chave PIX com CPF no banco onde deseja limite.</li>
+          <li><strong>Dia 6:</strong> Ative o Open Finance com o banco de maior movimentação.</li>
+          <li><strong>Dia 7:</strong> Solicite a proposta de crédito no valor proporcional a até 30% da sua capacidade.</li>
+        </ul>
+
+        <h2>Capítulo 4: Bancos e Cartões Facilitados</h2>
+        <p>Cartões como <strong>Nubank com Função Limite Construído</strong>, <strong>Inter CDB Mais Limite</strong> e <strong>PagBank</strong> convertem depósitos em limite de crédito garantido, acelerando a subida de pontos no birô em até 60 dias. Para liberação imediata sem consulta ao Serasa, a <strong>Antecipação do Saque-Aniversário do FGTS</strong> é a opção de menor custo financeiro.</p>
+
+        <h2>Bônus: Modelo de Notificação para Limpeza do Registrato</h2>
+        <p>Utilize o modelo formal abaixo no SAC ou Ouvidoria da instituição que mantém restrição indevida no Banco Central:</p>
+
+        <div class="template-box">
+AO BANCO: [NOME DO BANCO]<br>
+SETOR DE OUVIDORIA E COMPLIANCE<br><br>
+
+ASSUNTO: EXCLUSÃO DE ANOTAÇÃO NO SISTEMA SCR / REGISTRATO (BACEN)<br><br>
+
+Eu, [SEU NOME COMPLETO], CPF [SEU CPF], requeiro a imediata baixa e exclusão da anotação no campo "Prejuízo / Operações Vencidas" referente ao contrato nº [NÚMERO DO CONTRATO], tendo em vista a [quitação plena do débito / prescrição quinquenal nos termos do art. 206, § 5º do Código Civil e art. 43 do CDC].<br><br>
+
+Conforme jurisprudência pacificada do Superior Tribunal de Justiça (STJ - Súmula 323), a manutenção de registro negativo no SCR após quitação ou prescrição configura restrição indevida de crédito. Solicito a regularização no prazo de 5 dias úteis.<br><br>
+
+[CIDADE - UF], [DATA ATUAL].<br>
+[SEU NOME COMPLETO] - CPF: [SEU CPF]
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>© 2026 Valore Brasil Correspondente Bancário • Todos os direitos reservados • CNPJ: 00.000.000/0001-00</p>
+  </footer>
+
+</body>
+</html>

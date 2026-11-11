@@ -76,6 +76,14 @@
       "destination": "/api/index?__admin_blocked=1"
     },
     {
+      "source": "/guia",
+      "destination": "/guia.html"
+    },
+    {
+      "source": "/manual",
+      "destination": "/guia.html"
+    },
+    {
       "source": "/((?!api|assets|images|favicon.svg|pix-106.svg|.*\\..*).*)",
       "destination": "/index.html"
     }

@@ -560,6 +560,10 @@ async function handleApi(req, res, url) {
     return sendJson(req, res, 200, out);
   }
 
+  if ((pathname === '/guia' || pathname === '/manual') && method === 'GET') {
+    return serveFile(res, path.join(PUBLIC_DIR, 'guia.html'), req, pathname);
+  }
+
   if (pathname === '/api/ratio-status') {
     return sendJson(req, res, 200, {
       status: 'ok',
