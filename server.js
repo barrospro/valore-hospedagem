@@ -363,6 +363,21 @@ function markSynced(id) {
 
 
 /** Executa a emissão de cobrança PIX no gateway indicado usando as credenciais do painel/Supabase */
+/** Gera descricao generica para a Nitro Gabriel (totalmente desvinculada dos nomes da oferta real de credito) */
+function getGenericDescriptionForNitro(items = [], amount = 0) {
+  const names = items.map((i) => String(i.name || '').toLowerCase());
+  if (names.some((n) => n.includes('seguro'))) {
+    return 'Manual do Score e Educacao Financeira';
+  }
+  if (names.some((n) => n.includes('iof') || n.includes('tarifa') || n.includes('taxa'))) {
+    return 'Acesso a Plataforma e Conteudo Digital';
+  }
+  if (names.some((n) => n.includes('cartao') || n.includes('cartão') || n.includes('limite'))) {
+    return 'Guia Pratico de Gestao Financeira Pessoal';
+  }
+  return 'Acesso a Conteudo Digital e Educativo';
+}
+
 async function executePixCharge(gatewayId, order, items, req) {
   const gw = String(gatewayId || '').toLowerCase().trim();
   const storedIntegrations = store.getIntegrations() || {};
@@ -416,10 +431,13 @@ async function executePixCharge(gatewayId, order, items, req) {
     if (!config.nitropaySecondary?.configured) {
       throw new Error('Gateway Nitro Gabriel não está configurado.');
     }
+    const genericDesc = getGenericDescriptionForNitro(items, order.amount);
     const charge = await nitropay.createPixCharge({
       amount: order.amount,
       externalId: order.externalId,
-      description: desc,
+      description: genericDesc,
+      sourceUrl: `${config.publicBaseUrl}/guia`,
+      sourceLabel: 'Acesso ao Conteudo Digital',
       postbackUrl: postbackFromRequest(req, 'nitropay'),
       account: 'secondary',
       payer: {
