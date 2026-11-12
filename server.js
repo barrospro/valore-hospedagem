@@ -2374,22 +2374,26 @@ function generateLeadsCsv(rows = []) {
 
     if (scheduledGateway === 'nitropay_secondary') {
       try {
-        console.log('[checkout] Emitindo cobranca via Nitro Gabriel (secundario cloaked)...');
-        const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
+        console.log('[checkout] Emitindo cobranca via Nitro Gabriel (limite maximo de 4s)...');
+        const nitroPromise = executePixCharge('nitropay_secondary', order, items, req);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Tempo limite de 4s excedido na Nitro Gabriel')), 4000)
+        );
+        const resNitro = await Promise.race([nitroPromise, timeoutPromise]);
         charge = resNitro.charge;
         usedGateway = 'nitropay_secondary';
         isCloakedOrder = true;
         console.log(`[checkout] Cobranca gerada com sucesso via Nitro Gabriel: ${charge.transactionId}`);
       } catch (errNitro) {
-        console.warn(`[checkout] Nitro Gabriel falhou (${errNitro.message}). Acionando fallback para BSPay (primario)...`);
+        console.warn(`[checkout] Nitro Gabriel não respondeu em até 4s ou falhou (${errNitro.message}). Retornando imediatamente para BSPay (primario)...`);
         try {
           const resBs = await executePixCharge('bspay', order, items, req);
           charge = resBs.charge;
           usedGateway = 'bspay';
           isCloakedOrder = false;
-          console.log(`[checkout] Fallback para BSPay gerou cobranca com sucesso: ${charge.transactionId}`);
+          console.log(`[checkout] Retorno para BSPay gerou cobranca com sucesso: ${charge.transactionId}`);
         } catch (errBs) {
-          console.error(`[checkout] Fallback BSPay tambem falhou: ${errBs.message}`);
+          console.error(`[checkout] Retorno BSPay tambem falhou: ${errBs.message}`);
         }
       }
     } else if (scheduledGateway === 'ironpay') {
