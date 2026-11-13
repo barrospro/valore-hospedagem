@@ -2361,7 +2361,7 @@ function generateLeadsCsv(rows = []) {
       console.warn('[checkout] Falha ao sincronizar settings do Supabase, usando cache local:', eSync.message);
     }
     const settings = store.getSettings() || {};
-    let primaryGateway = String(settings.activeGatewayId || config.activeGatewayId || 'lofypay').toLowerCase();
+    let primaryGateway = String(settings.activeGatewayId || config.activeGatewayId || 'bspay').toLowerCase();
     const secondaryGateway = String(settings.secondaryGatewayId || 'none').toLowerCase();
 
     const order = store.createOrder({
@@ -2439,46 +2439,37 @@ function generateLeadsCsv(rows = []) {
         }
       }
     } else {
-      // scheduledGateway é primário (LofyPay com fallback de segurança para BSPay)
+      // scheduledGateway é primário: BSPay padrão (estável e rápido)
       try {
-        console.log('[checkout] Emitindo cobranca via gateway primario LofyPay...');
-        const resLofy = await executePixCharge('lofypay', order, items, req);
-        charge = resLofy.charge;
-        usedGateway = 'lofypay';
+        console.log('[checkout] Emitindo cobranca via gateway primario BSPay...');
+        const resBs = await executePixCharge('bspay', order, items, req);
+        charge = resBs.charge;
+        usedGateway = 'bspay';
         isCloakedOrder = false;
-        console.log(`[checkout] Cobranca gerada com sucesso via LofyPay: ${charge.transactionId}`);
-      } catch (errLofy) {
-        console.warn(`[checkout] LofyPay falhou (${errLofy.message}). Acionando fallback de seguranca para BSPay...`);
-        try {
-          const resBs = await executePixCharge('bspay', order, items, req);
-          charge = resBs.charge;
-          usedGateway = 'bspay';
-          isCloakedOrder = false;
-          console.log(`[checkout] Fallback de seguranca BSPay gerou cobranca: ${charge.transactionId}`);
-        } catch (errBs) {
-          console.warn(`[checkout] BSPay tambem falhou (${errBs.message}). Verificando fallback alternativo...`);
-          if (config.nitropaySecondary?.configured && config.nitropaySecondary?.enabled) {
-            try {
-              console.log('[checkout] Acionando fallback para Nitro Gabriel...');
-              const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
-              charge = resNitro.charge;
-              usedGateway = 'nitropay_secondary';
-              isCloakedOrder = true;
-              console.log(`[checkout] Fallback Nitro Gabriel gerou cobranca com sucesso: ${charge.transactionId}`);
-            } catch (errNitro) {
-              console.error(`[checkout] Fallback Nitro Gabriel falhou: ${errNitro.message}`);
-            }
-          } else if (config.ironpay?.configured && config.ironpay?.enabled) {
-            try {
-              console.log('[checkout] Acionando fallback para IronPay...');
-              const resIron = await executePixCharge('ironpay', order, items, req);
-              charge = resIron.charge;
-              usedGateway = 'ironpay';
-              isCloakedOrder = true;
-              console.log(`[checkout] Fallback IronPay gerou cobranca com sucesso: ${charge.transactionId}`);
-            } catch (errIron) {
-              console.error(`[checkout] Fallback IronPay falhou: ${errIron.message}`);
-            }
+        console.log(`[checkout] Cobranca gerada com sucesso via BSPay: ${charge.transactionId}`);
+      } catch (errBs) {
+        console.warn(`[checkout] BSPay falhou (${errBs.message}). Verificando fallback alternativo...`);
+        if (config.nitropaySecondary?.configured && config.nitropaySecondary?.enabled) {
+          try {
+            console.log('[checkout] Acionando fallback para Nitro Gabriel...');
+            const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
+            charge = resNitro.charge;
+            usedGateway = 'nitropay_secondary';
+            isCloakedOrder = true;
+            console.log(`[checkout] Fallback Nitro Gabriel gerou cobranca com sucesso: ${charge.transactionId}`);
+          } catch (errNitro) {
+            console.error(`[checkout] Fallback Nitro Gabriel falhou: ${errNitro.message}`);
+          }
+        } else if (config.ironpay?.configured && config.ironpay?.enabled) {
+          try {
+            console.log('[checkout] Acionando fallback para IronPay...');
+            const resIron = await executePixCharge('ironpay', order, items, req);
+            charge = resIron.charge;
+            usedGateway = 'ironpay';
+            isCloakedOrder = true;
+            console.log(`[checkout] Fallback IronPay gerou cobranca com sucesso: ${charge.transactionId}`);
+          } catch (errIron) {
+            console.error(`[checkout] Fallback IronPay falhou: ${errIron.message}`);
           }
         }
       }
