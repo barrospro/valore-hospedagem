@@ -456,8 +456,7 @@ async function executePixCharge(gatewayId, order, items, req) {
       amount: order.amount,
       externalId: order.externalId,
       description: genericDesc,
-      sourceUrl: `${config.publicBaseUrl}/guia`,
-      sourceLabel: 'Acesso ao Conteudo Digital',
+      // Não declara sourceUrl nem sourceLabel para a Nitro Gabriel (total desvinculação)
       postbackUrl: postbackFromRequest(req, 'nitropay'),
       account: 'secondary',
       payer: {
