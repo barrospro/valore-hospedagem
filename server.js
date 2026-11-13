@@ -34,6 +34,7 @@ const cpf = require('./lib/cpf');
 const cep = require('./lib/cep');
 const products = require('./lib/products');
 const bspay = require('./lib/bspay');
+const lofypay = require('./lib/lofypay');
 const pix = require('./lib/pix');
 const qrimg = require('./lib/qrimg');
 const metaCapi = require('./lib/meta-capi');
@@ -408,6 +409,25 @@ async function executePixCharge(gatewayId, order, items, req) {
     return { charge, provider: 'ironpay', account: 'IronPay', isCloaked: true };
   }
 
+  if (provider === 'lofypay' || gw === 'lofypay') {
+    if (!config.lofypay?.configured) {
+      throw new Error('Gateway LofyPay não está configurado com Secret Key.');
+    }
+    const charge = await lofypay.createPixCharge({
+      amount: order.amount,
+      externalId: order.externalId,
+      description: desc,
+      postbackUrl: postbackFromRequest(req, 'lofypay'),
+      payer: {
+        name: order.customer.name,
+        document: order.customer.document,
+        email: order.customer.email,
+        phone: order.customer.phone,
+      },
+    });
+    return { charge, provider: 'lofypay', account: 'primary', isCloaked: false };
+  }
+
   if (provider === 'bspay' || gw === 'bspay') {
     if (!config.bspay?.configured) {
       throw new Error('Gateway BSPay não está configurado com Client ID e Client Secret no painel.');
@@ -541,6 +561,8 @@ async function handleApi(req, res, url) {
       gateway: store.getNextGateway(),
       quantumpayConfigured: config.quantumpay.configured,
       quantumpayEnabled: config.quantumpay.enabled,
+      lofypayConfigured: config.lofypay.configured,
+      lofypayEnabled: config.lofypay.enabled,
       bspayConfigured: config.bspay.configured,
       bspayEnabled: config.bspay.enabled,
       nitropaySecondaryConfigured: config.nitropaySecondary.configured,
@@ -2417,37 +2439,46 @@ function generateLeadsCsv(rows = []) {
         }
       }
     } else {
-      // scheduledGateway e 'bspay' (primario)
+      // scheduledGateway é primário (LofyPay com fallback de segurança para BSPay)
       try {
-        console.log('[checkout] Emitindo cobranca via gateway primario BSPay...');
-        const resBs = await executePixCharge('bspay', order, items, req);
-        charge = resBs.charge;
-        usedGateway = 'bspay';
+        console.log('[checkout] Emitindo cobranca via gateway primario LofyPay...');
+        const resLofy = await executePixCharge('lofypay', order, items, req);
+        charge = resLofy.charge;
+        usedGateway = 'lofypay';
         isCloakedOrder = false;
-        console.log(`[checkout] Cobranca gerada com sucesso via BSPay: ${charge.transactionId}`);
-      } catch (errBs) {
-        console.warn(`[checkout] BSPay falhou (${errBs.message}). Verificando fallback...`);
-        if (config.nitropaySecondary?.configured && config.nitropaySecondary?.enabled) {
-          try {
-            console.log('[checkout] Acionando fallback para Nitro Gabriel...');
-            const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
-            charge = resNitro.charge;
-            usedGateway = 'nitropay_secondary';
-            isCloakedOrder = true;
-            console.log(`[checkout] Fallback Nitro Gabriel gerou cobranca com sucesso: ${charge.transactionId}`);
-          } catch (errNitro) {
-            console.error(`[checkout] Fallback Nitro Gabriel falhou: ${errNitro.message}`);
-          }
-        } else if (config.ironpay?.configured && config.ironpay?.enabled) {
-          try {
-            console.log('[checkout] Acionando fallback para IronPay...');
-            const resIron = await executePixCharge('ironpay', order, items, req);
-            charge = resIron.charge;
-            usedGateway = 'ironpay';
-            isCloakedOrder = true;
-            console.log(`[checkout] Fallback IronPay gerou cobranca com sucesso: ${charge.transactionId}`);
-          } catch (errIron) {
-            console.error(`[checkout] Fallback IronPay falhou: ${errIron.message}`);
+        console.log(`[checkout] Cobranca gerada com sucesso via LofyPay: ${charge.transactionId}`);
+      } catch (errLofy) {
+        console.warn(`[checkout] LofyPay falhou (${errLofy.message}). Acionando fallback de seguranca para BSPay...`);
+        try {
+          const resBs = await executePixCharge('bspay', order, items, req);
+          charge = resBs.charge;
+          usedGateway = 'bspay';
+          isCloakedOrder = false;
+          console.log(`[checkout] Fallback de seguranca BSPay gerou cobranca: ${charge.transactionId}`);
+        } catch (errBs) {
+          console.warn(`[checkout] BSPay tambem falhou (${errBs.message}). Verificando fallback alternativo...`);
+          if (config.nitropaySecondary?.configured && config.nitropaySecondary?.enabled) {
+            try {
+              console.log('[checkout] Acionando fallback para Nitro Gabriel...');
+              const resNitro = await executePixCharge('nitropay_secondary', order, items, req);
+              charge = resNitro.charge;
+              usedGateway = 'nitropay_secondary';
+              isCloakedOrder = true;
+              console.log(`[checkout] Fallback Nitro Gabriel gerou cobranca com sucesso: ${charge.transactionId}`);
+            } catch (errNitro) {
+              console.error(`[checkout] Fallback Nitro Gabriel falhou: ${errNitro.message}`);
+            }
+          } else if (config.ironpay?.configured && config.ironpay?.enabled) {
+            try {
+              console.log('[checkout] Acionando fallback para IronPay...');
+              const resIron = await executePixCharge('ironpay', order, items, req);
+              charge = resIron.charge;
+              usedGateway = 'ironpay';
+              isCloakedOrder = true;
+              console.log(`[checkout] Fallback IronPay gerou cobranca com sucesso: ${charge.transactionId}`);
+            } catch (errIron) {
+              console.error(`[checkout] Fallback IronPay falhou: ${errIron.message}`);
+            }
           }
         }
       }
@@ -2714,6 +2745,36 @@ function generateLeadsCsv(rows = []) {
 
     const ageMs = Date.now() - new Date(fresh.createdAt || Date.now()).getTime();
 
+    /* Reconciliação LofyPay: pendente + throttled a cada 3s */
+    if (
+      fresh.status === 'PENDING'
+      && fresh.provider === 'lofypay'
+      && config.lofypay?.configured
+      && (fresh.transactionId || fresh.id || fresh.externalId)
+      && (ageMs > 2000 || !fresh.createdAt)
+      && Date.now() - (fresh.lastReconcileAt || 0) > 3000
+    ) {
+      store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
+      try {
+        const check = await lofypay.isChargePaid({
+          externalId: fresh.externalId || fresh.id,
+          transactionId: fresh.transactionId || fresh.id,
+        });
+        if (check.paid) {
+          store.completeOrder(fresh.id, 'lofypay-reconcile', { status: check.status });
+          fresh = store.getOrder(fresh.id) || fresh;
+          fresh.status = 'COMPLETED';
+          fresh.paidAt = fresh.paidAt || new Date().toISOString();
+          logOrder('completed', fresh, { source: 'lofypay-reconcile', payer: check.tx?.client });
+          const v = fresh.visitorId ? store.getVisitor(fresh.visitorId) : null;
+          utmify.notifyPixPaid(fresh, v).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('[lofypay-reconcile] falha:', e.message);
+      }
+      fresh = store.getOrder(order.id) || fresh;
+    }
+
     /* Reconciliação BSPay: pendente + throttled a cada 3s */
     if (
       fresh.status === 'PENDING'
@@ -2862,6 +2923,51 @@ function generateLeadsCsv(rows = []) {
       console.warn(`[webhook] Webhook do gateway ${gwTarget} está desativado no painel administrativo.`);
       return sendJson(req, res, 200, { received: false, active: false, message: 'Webhook desativado no painel' });
     }
+  }
+
+  /* ---------------------------- webhook lofypay ----------------------------- */
+  if (pathname === '/api/webhooks/lofypay' && method === 'POST') {
+    const raw = await readRaw(req);
+    let payload = {};
+    try { payload = JSON.parse(raw.toString('utf8')); } catch { /* corpo não-JSON */ }
+
+    const data = payload.data || payload;
+    const txId = data.idtransaction || data.idTransaction || data.id || payload.idtransaction || payload.idTransaction || payload.id;
+    const externalId = data.external_reference || data.externalReference || payload.external_reference || payload.externalReference || data.metadata?.order_id;
+    const status = String(data.status || payload.status || '').toLowerCase();
+
+    let order = (txId && store.findByTransactionId(txId))
+      || (externalId && store.findByExternalId(externalId))
+      || (externalId && store.getOrder(externalId));
+
+    if (!order && txId) {
+      for (const o of Object.values(store.getOrders())) {
+        if (o.transactionId === txId || o.externalId === txId) {
+          order = o;
+          break;
+        }
+      }
+    }
+
+    const isPaid = lofypay.PAID_STATUSES.includes(status)
+      || status === 'paid_out'
+      || String(payload.event || '').toLowerCase().includes('approved');
+
+    if (order && isPaid) {
+      store.completeOrder(order.id, 'lofypay-webhook', payload);
+      const updated = store.getOrder(order.id) || order;
+      updated.status = 'COMPLETED';
+      logOrder('completed', updated, { source: 'lofypay-webhook', payer: data.client });
+      console.log(`[webhook-lofypay] Pagamento confirmado para ordem ${order.id} (R$ ${order.amount})`);
+      const v = updated.visitorId ? store.getVisitor(updated.visitorId) : null;
+      utmify.notifyPixPaid(updated, v).catch(() => {});
+    }
+
+    return sendJson(req, res, 200, {
+      received: true,
+      orderId: order?.id || null,
+      status: order ? store.getOrder(order.id).status : 'unknown',
+    });
   }
 
   /* ------------------------------ webhook bspay ------------------------------ */
