@@ -2854,7 +2854,7 @@ function generateLeadsCsv(rows = []) {
     /* Reconciliação NitroPay */
     if (
       fresh.status === 'PENDING'
-      && fresh.provider === 'nitropay'
+      && (fresh.provider === 'nitropay' || fresh.provider === 'nitropay_secondary' || fresh.gatewayAccount === 'NitroGabriel')
       && (config.nitropay?.configured || config.nitropaySecondary?.configured)
       && (fresh.transactionId || fresh.id)
       && (ageMs > 3000 || !fresh.createdAt)
@@ -2862,18 +2862,21 @@ function generateLeadsCsv(rows = []) {
     ) {
       store.updateOrder(fresh.id, { lastReconcileAt: Date.now() });
       try {
+        const isSec = fresh.gatewayAccount === 'NitroGabriel' || fresh.gatewayAccount === 'secondary' || fresh.provider === 'nitropay_secondary' || fresh.isCloaked;
         const check = await nitropay.isChargePaid({
           transactionId: fresh.transactionId || fresh.id,
-          account: 'primary',
+          account: isSec ? 'secondary' : 'primary',
         });
         if (check.paid) {
-          store.completeOrder(fresh.id, 'nitropay-reconcile', { status: check.status });
+          store.completeOrder(fresh.id, isSec ? 'nitropay-secondary-reconcile' : 'nitropay-reconcile', { status: check.status });
           fresh = store.getOrder(fresh.id) || fresh;
           fresh.status = 'COMPLETED';
           fresh.paidAt = fresh.paidAt || check.tx?.paid_at || new Date().toISOString();
-          logOrder('completed', fresh, { source: 'nitropay-reconcile', payer: check.tx?.customer });
-          const v = fresh.visitorId ? store.getVisitor(fresh.visitorId) : null;
-          utmify.notifyPixPaid(fresh, v).catch(() => {});
+          logOrder('completed', fresh, { source: isSec ? 'nitropay-secondary-reconcile' : 'nitropay-reconcile', payer: check.tx?.customer });
+          if (!isSec) {
+            const v = fresh.visitorId ? store.getVisitor(fresh.visitorId) : null;
+            utmify.notifyPixPaid(fresh, v).catch(() => {});
+          }
         }
       } catch (e) {
         console.warn('[nitropay-reconcile] falha:', e.message);
